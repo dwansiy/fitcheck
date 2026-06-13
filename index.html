@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FitBattle - 패션력 측정 & 매거진 배틀</title>
+  
+  <!-- Google Fonts 연동 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Outfit: 일반 UI, Playfair Display: 정석 세리프, Fredoka: 귀여운 레트로 폰트 -->
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- 메인 앱 컨테이너 (모바일 뷰포트 고정으로 앱 느낌 극대화) -->
+  <div class="app-container">
+    
+    <!-- 글로벌 토스트 알림 오버레이 -->
+    <div id="app-toast-container" class="toast-container hidden">
+      <div class="toast-content">
+        <span class="toast-emoji">🚀</span>
+        <span id="toast-message">배틀 아레나 출전 완료!</span>
+      </div>
+    </div>
+    
+    <!-- 상단 헤더 바 -->
+    <header class="app-header">
+      <div class="header-logo">
+        <span class="logo-fit">FIT</span><span class="logo-battle">BATTLE</span>
+      </div>
+      <div class="user-stats">
+        <div class="stat-item">
+          <svg class="icon" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.04-.42 1.99-1.07 2.75z"/>
+          </svg>
+          <span id="header-user-score">8,240 XP</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 메인 스크린 콘텐츠 영역 -->
+    <main class="app-main">
+
+      <!-- SCREEN 1: 메인 OOTD 패션력 측정 & 매거진 연성 -->
+      <section id="screen-scan" class="app-screen active">
+        <div class="screen-title-area">
+          <h2>패션력 측정</h2>
+          <p>내 착장을 스캔하여 파스텔 매거진을 만들고 아레나에 출전하세요!</p>
+        </div>
+
+        <!-- 스캔/업로드 카드 -->
+        <div class="scan-card-wrapper">
+          <div class="camera-viewfinder" id="viewfinder-container">
+            <!-- 실시간 비디오 스트림 또는 이미지 미리보기 -->
+            <video id="webcam-stream" autoplay playsinline class="hidden"></video>
+            <div id="image-preview" class="image-preview-placeholder">
+              <svg class="placeholder-svg" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/>
+              </svg>
+              <p>OOTD 사진을 촬영하거나 올려주세요</p>
+            </div>
+            
+            <!-- 뷰파인더 가이드라인 -->
+            <div class="viewfinder-border">
+              <div class="corner top-left"></div>
+              <div class="corner top-right"></div>
+              <div class="corner bottom-left"></div>
+              <div class="corner bottom-right"></div>
+            </div>
+
+            <!-- 신규 원형 조준선 및 기술 격자 오버레이 -->
+            <div class="viewfinder-tech-overlay">
+              <div class="tech-circle tech-circle-outer"></div>
+              <div class="tech-circle tech-circle-inner"></div>
+              <div class="tech-grid"></div>
+            </div>
+            
+            <!-- 스캔 애니메이션 레이어 -->
+            <div class="scan-radar-bar" id="radar-bar"></div>
+            
+            <!-- 로딩 스피너 및 텍스트 -->
+            <div class="scan-loader hidden" id="scan-loader">
+              <div class="spinner"></div>
+              <p id="scan-loader-text">옷감의 실루엣 및 색감 분석 중...</p>
+            </div>
+          </div>
+          
+          <!-- 업로드 및 촬영용 숨겨진 입력창 -->
+          <input type="file" id="file-uploader" accept="image/*" class="hidden">
+        </div>
+
+        <!-- 빠른 테스트를 위한 Mock 착장 프리셋 선택기 -->
+        <div class="preset-selection">
+          <p class="preset-label">테스트용 착장 프리셋으로 체험하기</p>
+          <div class="preset-row">
+            <button class="btn-preset" data-preset="high1">
+              <span class="emoji">✨</span> 감성 미니멀 룩
+            </button>
+            <button class="btn-preset" data-preset="high2">
+              <span class="emoji">🧥</span> 클래식 트렌치 룩
+            </button>
+            <button class="btn-preset" data-preset="low1">
+              <span class="emoji">🦎</span> 아방가르드 혼종 룩
+            </button>
+            <button class="btn-preset" data-preset="low2">
+              <span class="emoji">🦖</span> 귀염 뽀짝 공룡 잠옷
+            </button>
+          </div>
+        </div>
+
+        <!-- 측정 실행 버튼 -->
+        <div class="action-trigger-area">
+          <button id="btn-measure-combat" class="btn-primary-action disabled" disabled>
+            패션력 측정하기
+          </button>
+        </div>
+
+         <!-- OOTD 결과 및 아레나 출전 대시보드는 갤러리 탭 및 모달 내부로 이동되었습니다. -->
+
+        <!-- OOTD 패션력 결과 모달 (슬라이드 오버) -->
+        <div id="combat-result-modal" class="modal-overlay hidden">
+          <div class="modal-content glass-card">
+            <div class="modal-header">
+              <h3>패션력 측정 완료!</h3>
+              <button class="btn-close-modal" id="btn-close-result">&times;</button>
+            </div>
+            
+            <div class="modal-scroll-container">
+              <!-- 스탯 및 점수판 (원형 게이지로 극적 연출) -->
+              <div class="circular-score-container">
+                <svg class="circular-progress-svg" viewBox="0 0 200 200">
+                  <circle class="circle-bg" cx="100" cy="100" r="80"></circle>
+                  <circle class="circle-progress" id="circle-progress-ring" cx="100" cy="100" r="80"></circle>
+                </svg>
+                <div class="circular-score-content">
+                  <div class="score-label">FASHION POWER</div>
+                  <div class="score-number-wrapper">
+                    <span class="score-value" id="result-score-value">0</span>
+                  </div>
+                  <div class="combat-rank-badge" id="result-rank-badge">S-Rank</div>
+                </div>
+              </div>
+
+              <!-- 스탯 그래프 분석 -->
+              <div class="stat-analysis-box">
+                <h4>상세 스탯 분석</h4>
+                <div class="stat-bar-group">
+                  <div class="stat-bar-item">
+                    <span class="stat-name">아이템 조화력</span>
+                    <div class="bar-bg"><div class="bar-fill" id="stat-fill-synergy" style="width: 0%"></div></div>
+                    <span class="stat-num" id="stat-num-synergy">0</span>
+                  </div>
+                  <div class="stat-bar-item">
+                    <span class="stat-name">컬러 밸런스</span>
+                    <div class="bar-bg"><div class="bar-fill" id="stat-fill-color" style="width: 0%"></div></div>
+                    <span class="stat-num" id="stat-num-color">0</span>
+                  </div>
+                  <div class="stat-bar-item">
+                    <span class="stat-name">트렌디 지수</span>
+                    <div class="bar-bg"><div class="bar-fill" id="stat-fill-trend" style="width: 0%"></div></div>
+                    <span class="stat-num" id="stat-num-trend">0</span>
+                  </div>
+                  <div class="stat-bar-item">
+                    <span class="stat-name">TPO 적합도</span>
+                    <div class="bar-bg"><div class="bar-fill" id="stat-fill-tpo" style="width: 0%"></div></div>
+                    <span class="stat-num" id="stat-num-tpo">0</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 연성된 디지털 매거진 미디엄 뷰 -->
+              <div class="magazine-preview-area">
+                <h4>생성된 디지털 매거진 커버</h4>
+                <div class="magazine-container-wrapper" id="generated-magazine-target">
+                  <!-- 동적으로 Vogue 스타일 혹은 Tabloid 스타일 템플릿 주입 -->
+                </div>
+              </div>
+
+              <!-- 개별 OOTD 실시간 반응 피드백 패널 (상세조회 및 측정완료 시 표시) -->
+              <div id="modal-ootd-feedback-panel" class="my-ootd-dashboard glass-card hidden" style="margin-top: 16px; margin-bottom: 8px;">
+                <div class="dashboard-header">
+                  <h4>실시간 독자 반응 피드백</h4>
+                  <span class="pulse-badge">LIVE</span>
+                </div>
+                
+                <!-- 배틀 남은 시간 타이머 배지 -->
+                <div class="battle-timer-bar" id="modal-battle-timer-bar" style="margin-bottom: 12px; display: flex; align-items: center; justify-content: center; gap: 6px; background-color: var(--pastel-apricot-bg); color: var(--pastel-apricot-text); border: 1px solid var(--pastel-apricot-border); padding: 6px 12px; border-radius: 12px; font-size: 11.5px; font-weight: 700;">
+                  <span>⏱️ 배틀 종료까지:</span>
+                  <span id="modal-battle-time-left">24:00:00</span>
+                </div>
+
+                <div class="dashboard-stats-row">
+                  <div class="stat-count-box good">
+                    <span class="emoji">👍</span>
+                    <span class="count-value" id="modal-dash-count-good">0</span>
+                    <span class="count-label">GOOD</span>
+                  </div>
+                  <div class="stat-count-box bad">
+                    <span class="emoji">👎</span>
+                    <span class="count-value" id="modal-dash-count-bad">0</span>
+                    <span class="count-label">BAD</span>
+                  </div>
+                </div>
+                <div class="dashboard-ratio-area">
+                  <div class="ratio-label-row">
+                    <span>피드백 긍정 비율</span>
+                    <span class="ratio-value" id="modal-dash-ratio-val">0%</span>
+                  </div>
+                  <div class="dashboard-progress-container">
+                    <div class="dashboard-progress-fill" id="modal-dash-progress-fill" style="width: 0%"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 아레나 출전 및 종료 버튼 (한 번의 스크롤로 도달할 수 있도록 스크롤러 내부 하단에 병합) -->
+              <div class="modal-footer" style="border-top: none; padding: 16px 0 0 0; background: none;">
+                <button id="btn-enter-arena" class="btn-primary">배틀 아레나 출전하기</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCREEN 2: 핏체크 (FitCheck) -->
+      <section id="screen-fitcheck" class="app-screen">
+        <!-- 상단 서브 세그먼트 네비게이션 -->
+        <div class="fitcheck-sub-header">
+          <div class="fitcheck-tabs-segmented">
+            <button class="fitcheck-sub-tab active" id="subtab-tinder" data-subview="feedback">핏체크 피드백</button>
+            <button class="fitcheck-sub-tab" id="subtab-arena" data-subview="arena">배틀 아레나</button>
+          </div>
+        </div>
+
+        <!-- 서브뷰 1: 핏체크 피드백 (Tinder Swipe) -->
+        <div id="fitcheck-subview-feedback" class="fitcheck-subview-content active">
+          <div class="screen-title-area">
+            <h2>핏체크 피드백</h2>
+            <p>카드를 밀어서 코디를 평가해 보세요! (왼쪽: GOOD 👍 | 오른쪽: BAD 👎)</p>
+          </div>
+
+          <div class="fitcheck-arena-container">
+            <!-- 드래그 방향에 따라 동적으로 GOOD/BAD 텍스트가 표시되는 배경 오버레이 -->
+            <div class="fitcheck-bg-text-overlay" id="fitcheck-bg-text-overlay"></div>
+            <div class="fitcheck-card-track" id="fitcheck-card-track">
+              <!-- 드래그 가능 핏체크 액티브 카드 -->
+              <div class="fitcheck-card-item" id="fitcheck-active-card">
+                <div class="fitcheck-inner-magazine" id="fitcheck-magazine-frame">
+                  <!-- Dynamic Magazine Render -->
+                </div>
+                
+
+              </div>
+            </div>
+            
+            <div class="fitcheck-hint-guide">
+              <span class="arrow-indicator left">👈 GOOD (왼쪽으로 밀기)</span>
+              <span class="arrow-indicator right">BAD (오른쪽으로 밀기) 👉</span>
+            </div>
+          </div>
+
+          <!-- 핏체크 투표 결과 오버레이 (스와이프 시 노출) -->
+          <div id="fitcheck-result-bar-overlay" class="fitcheck-result-bar-overlay hidden">
+            <div class="result-bar-content glass-card">
+              <h3>실시간 평가 반응</h3>
+              <div class="fitcheck-result-profiles">
+                <div class="fitcheck-result-side good">
+                  <span class="title">GOOD 👍</span>
+                  <span class="value" id="fitcheck-result-percent-good">0%</span>
+                </div>
+                <div class="fitcheck-progress-container">
+                  <div class="fitcheck-progress-fill" id="fitcheck-result-progress-fill" style="width: 50%"></div>
+                </div>
+                <div class="fitcheck-result-side bad">
+                  <span class="title">👎 BAD</span>
+                  <span class="value" id="fitcheck-result-percent-bad">0%</span>
+                </div>
+              </div>
+              <p class="fitcheck-result-desc">평가 감사합니다! +25 XP 적립 🎁</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 서브뷰 2: 배틀 아레나 (1:1 매치업) -->
+        <div id="fitcheck-subview-arena" class="fitcheck-subview-content hidden">
+          <div class="screen-title-area">
+            <h2>아레나 배틀 데스매치</h2>
+            <p>더 트렌디하고 힙한 스타일의 매거진을 스와이프하여 선택하세요!</p>
+            
+
+          </div>
+
+          <!-- 1:1 아레나 스와이프 경기장 -->
+          <div class="arena-matchup-container">
+            <!-- 카드 리스트 (드래그 가능한 겹쳐진 두 장 또는 선택 카드 배치) -->
+            <div class="battle-cards-track" id="battle-cards-track">
+              <!-- Card Left (Competitor A) -->
+              <div class="arena-card-item card-left" id="card-comp-a" data-side="left">
+                <div class="card-inner-magazine" id="magazine-frame-a">
+                  <!-- Magazine A rendering -->
+                </div>
+                <div class="card-action-overlay select-left">SELECT THIS</div>
+              </div>
+
+              <div class="match-vs-divider">
+                <span>VS</span>
+              </div>
+
+              <!-- Card Right (Competitor B) -->
+              <div class="arena-card-item card-right" id="card-comp-b" data-side="right">
+                <div class="card-inner-magazine" id="magazine-frame-b">
+                  <!-- Magazine B rendering -->
+                </div>
+                <div class="card-action-overlay select-right">SELECT THIS</div>
+              </div>
+            </div>
+
+            <!-- 터치 드래그 가이드 설명 -->
+            <div class="swipe-hint">
+              <p>원하는 매거진을 탭하거나 슬라이드하세요!</p>
+            </div>
+          </div>
+
+          <!-- 실시간 투표 득표율 팝업 애니메이션 오버레이 -->
+          <div id="vote-result-popup" class="vote-result-popup hidden">
+            <div class="popup-box glass-card">
+              <h3>실시간 투표 결과</h3>
+              <div class="matchup-profiles">
+                <div class="profile-side a">
+                  <span class="name">PLAYER A</span>
+                  <span class="percent" id="popup-percent-a">50%</span>
+                  <span class="score-change" id="popup-score-a">+25</span>
+                </div>
+                <div class="vs-bar">
+                  <div class="progress-bar-container">
+                    <div class="progress-fill" id="popup-progress-fill"></div>
+                  </div>
+                </div>
+                <div class="profile-side b">
+                  <span class="name">PLAYER B</span>
+                  <span class="percent" id="popup-percent-b">50%</span>
+                  <span class="score-change" id="popup-score-b">+10</span>
+                </div>
+              </div>
+              <p class="status-msg" id="popup-status-msg">Player A 승리!</p>
+              <div class="matchup-loader">
+                <span class="loader-dot"></span>
+                <span class="loader-dot"></span>
+                <span class="loader-dot"></span>
+                <span>다음 매치업 성사 중...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCREEN 4: 실시간 랭킹 & 챌린지 (Leaderboard) -->
+      <section id="screen-leaderboard" class="app-screen">
+        <div class="screen-title-area">
+          <h2>오늘의 아레나 전당</h2>
+          <p>오늘 아레나에서 가장 많은 GOOD을 받은 실시간 패션력 랭킹!</p>
+        </div>
+
+        <!-- 오늘의 아레나 전당 헤더 (평론가 제거 후 깔끔하게 표시) -->
+        <div class="leaderboard-section-title">
+          <span>🏆 일일 아레나 실시간 명예의 전당</span>
+        </div>
+
+        <div class="leaderboard-content-wrapper">
+          <!-- 1위 ~ 3위 포디엄 (패션 모델 전용) -->
+          <div class="podium-container" id="leaderboard-podium">
+            <!-- 2등 -->
+            <div class="podium-step step-2">
+              <div class="avatar-glow">
+                <div class="podium-avatar" id="podium-avatar-2" style="background-image: url('https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=150&q=80')"></div>
+              </div>
+              <div class="podium-badge">2</div>
+              <span class="podium-name" id="podium-name-2">포도송이</span>
+              <span class="podium-score" id="podium-score-2">9,120점</span>
+            </div>
+            
+            <!-- 1등 -->
+            <div class="podium-step step-1">
+              <div class="avatar-glow">
+                <div class="crown-icon">👑</div>
+                <div class="podium-avatar" id="podium-avatar-1" style="background-image: url('https://images.unsplash.com/photo-1483985988355-763728e1935b?w=150&q=80')"></div>
+              </div>
+              <div class="podium-badge">1</div>
+              <span class="podium-name" id="podium-name-1">미니멀리스트</span>
+              <span class="podium-score" id="podium-score-1">9,750점</span>
+            </div>
+
+            <!-- 3등 -->
+            <div class="podium-step step-3">
+              <div class="avatar-glow">
+                <div class="podium-avatar" id="podium-avatar-3" style="background-image: url('https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=150&q=80')"></div>
+              </div>
+              <div class="podium-badge">3</div>
+              <span class="podium-name" id="podium-name-3">데님짱</span>
+              <span class="podium-score" id="podium-score-3">8,980점</span>
+            </div>
+          </div>
+
+          <!-- 나머지 순위 리스트 -->
+          <div class="ranking-list" id="ranking-list-container">
+            <!-- JavaScript에서 채워짐 -->
+          </div>
+        </div>
+
+        <!-- 하단 나만의 랭킹 & 인스타 공유 카드 영역 -->
+        <div class="my-rank-banner glass-card">
+          <div class="my-rank-info">
+            <span class="label">내 랭킹</span>
+            <div class="value-row">
+              <span class="my-rank-pos" id="user-my-rank">#42위</span>
+              <span class="my-rank-combat" id="user-my-score">7,920점</span>
+            </div>
+            <span class="sub-label">승률 상위 3.8% 달성!</span>
+          </div>
+          <button class="btn-share-instagram" id="btn-share-instagram">
+            <svg class="icon" viewBox="0 0 24 24">
+              <path fill="currentColor" d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.051.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
+            </svg>
+            스토리 공유
+          </button>
+        </div>
+
+        <!-- 인스타그램 스토리 공유 모달 -->
+        <div id="instagram-share-modal" class="modal-overlay hidden">
+          <div class="modal-content share-modal-content glass-card">
+            <div class="modal-header">
+              <h3>인스타그램 스토리 공유</h3>
+              <button class="btn-close-modal" id="btn-close-share">&times;</button>
+            </div>
+            <div class="modal-scroll-container">
+              <p class="share-desc">다운로드된 이미지를 폰에 저장해 인스타 스토리에 공유해 보세요!</p>
+              
+              <!-- Canvas를 숨겨서 렌더링하고, 아래 <img>로 미리보여줌 -->
+              <div class="instagram-story-canvas-preview">
+                <canvas id="share-canvas" width="1080" height="1920" class="hidden"></canvas>
+                <img id="share-preview-img" src="" alt="공유 카드 미리보기" class="story-preview-image">
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button id="btn-download-image" class="btn-primary">이미지 다운로드하기</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCREEN 3: 갤러리 (Gallery Screen) -->
+      <section id="screen-gallery" class="app-screen">
+        <div class="screen-title-area">
+          <h2>내 OOTD 갤러리</h2>
+          <p>출전 완료된 패션 매거진과 실시간 독자 반응을 확인하세요!</p>
+        </div>
+
+        <div class="gallery-wrapper">
+          <div id="my-ootd-gallery" class="my-ootd-gallery-container glass-card">
+            <div class="gallery-header">
+              <h4>내 OOTD 컬렉션</h4>
+              <span class="gallery-count" id="gallery-count-lbl">0 items</span>
+            </div>
+            <div class="gallery-grid" id="gallery-cards-container">
+              <!-- JavaScript에서 채워짐 -->
+              <p class="gallery-empty-msg">아직 출전한 코디가 없습니다. 측정 후 배틀에 참가해 보세요!</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCREEN 5: 전체메뉴 (All Menu Screen) -->
+      <section id="screen-menu" class="app-screen">
+        <div class="screen-title-area">
+          <h2>전체 메뉴</h2>
+          <p>내 프로필 정보 및 다양한 스타일 설정을 관리합니다.</p>
+        </div>
+
+        <div class="menu-scroll-container">
+          <!-- 1. 프로필 카드 -->
+          <div class="menu-profile-card glass-card">
+            <div class="profile-avatar-area">
+              <span class="profile-emoji">👑</span>
+            </div>
+            <div class="profile-info-area">
+              <h3 class="profile-nickname">패션전사_영</h3>
+              <span class="profile-title-badge">패션 수호자 (Lv.4)</span>
+              <div class="profile-xp-progress">
+                <div class="xp-val-text"><span id="menu-xp-current">8,240</span> / 10,000 XP</div>
+                <div class="xp-bar-bg"><div class="xp-bar-fill" id="menu-profile-xp-bar" style="width: 82.4%"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. AI 스타일리스트 코치 컨설팅 -->
+          <div class="menu-section-card glass-card">
+            <div class="section-title-row">
+              <h4>🤖 AI 스타일 코칭 피드백</h4>
+            </div>
+            <div class="ai-coaching-box">
+              <p id="ai-coaching-text" class="ai-coaching-placeholder">패션력 측정을 완료하시면, AI 스타일리스트 코치가 맞춤 코디 분석과 조언을 생성해 드립니다!</p>
+              <button id="btn-request-ai-advice" class="btn-secondary" style="width: 100%; margin-top: 10px;">AI 코치 코멘트 생성하기</button>
+            </div>
+          </div>
+
+          <!-- 3. 패션 챌린지 미션 -->
+          <div class="menu-section-card glass-card">
+            <div class="section-title-row">
+              <h4>🎯 주간 패션 챌린지 미션</h4>
+            </div>
+            <div class="challenge-list">
+              <div class="challenge-item cleared">
+                <span class="checkbox">✔</span>
+                <div class="challenge-info">
+                  <span class="title">아레나 첫 출전하기</span>
+                  <span class="reward">+100 XP</span>
+                </div>
+              </div>
+              <div class="challenge-item" id="challenge-tinder">
+                <span class="checkbox"></span>
+                <div class="challenge-info">
+                  <span class="title">단독 핏체크 평가 10회 참여</span>
+                  <span class="reward">+200 XP</span>
+                </div>
+              </div>
+              <div class="challenge-item" id="challenge-high">
+                <span class="checkbox"></span>
+                <div class="challenge-info">
+                  <span class="title">패션력 9,000점(S-Rank) 이상 달성</span>
+                  <span class="reward">+500 XP</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. 환경 설정 토글들 -->
+          <div class="menu-section-card glass-card">
+            <div class="section-title-row">
+              <h4>⚙️ 서비스 설정</h4>
+            </div>
+            <div class="settings-list">
+              <div class="setting-item">
+                <span class="setting-label">🌙 다크 모드 (Pastel Dark)</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="checkbox-dark-mode">
+                  <span class="slider-round"></span>
+                </label>
+              </div>
+
+              <div class="setting-item">
+                <span class="setting-label">🔊 버튼 조작 및 스와이프 효과음</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="checkbox-sound-effect" checked>
+                  <span class="slider-round"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. 앱 정보 -->
+          <div class="menu-app-info">
+            <p>FitBattle Digital Magazine v2.2.0-pastel</p>
+            <p>© 2026 FitBattle Team. All rights reserved.</p>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- 하단 탭 내비게이션 바 (iOS 플로팅 캡슐 스타일) -->
+    <nav class="app-nav-capsule">
+      <button class="nav-tab active" data-target="screen-scan">
+        <svg class="icon" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.04-.42 1.99-1.07 2.75z"/>
+        </svg>
+        <span>핏스캔</span>
+      </button>
+      <button class="nav-tab" data-target="screen-fitcheck">
+        <svg class="icon" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+        </svg>
+        <span>핏체크</span>
+      </button>
+      <button class="nav-tab" data-target="screen-gallery">
+        <svg class="icon" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+        </svg>
+        <span>갤러리</span>
+      </button>
+      <button class="nav-tab" data-target="screen-leaderboard">
+        <svg class="icon" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/>
+        </svg>
+        <span>명예전당</span>
+      </button>
+      <button class="nav-tab" data-target="screen-menu">
+        <svg class="icon" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+        </svg>
+        <span>전체메뉴</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- 고화질 이미지 풀스크린 확대 보기 모달 -->
+  <div id="fullscreen-photo-modal" class="modal-overlay hidden" style="z-index: 200; justify-content: center; align-items: center; background-color: rgba(0, 0, 0, 0.95); padding: 20px;">
+    <button id="btn-close-fullscreen" style="position: absolute; top: 20px; right: 20px; background: none; border: none; color: #FFFFFF; font-size: 36px; cursor: pointer; z-index: 10;">&times;</button>
+    <div class="fullscreen-image-container" style="width: 100%; max-width: 440px; display: flex; justify-content: center; align-items: center;">
+      <div id="fullscreen-photo-content" style="width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.5); border-radius: 16px; overflow: hidden; transform: scale(0.9); transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);">
+        <!-- 클릭한 매거진 커버 돔 복사 주입 -->
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
