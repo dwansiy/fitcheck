@@ -254,21 +254,27 @@
             <span class="hidden group-hover:inline-block font-headline text-[10px] font-black border-l border-black pl-1">SHOP</span>
           </div>
 
-          <!-- 핀 클릭 피드백 툴팁 박스 -->
-          <div id="feedback-tooltip" class="absolute bottom-4 left-4 right-4 bg-white border-[3px] border-black p-4 neo-shadow z-35 hidden transition-all duration-300">
-            <div class="flex justify-between items-start mb-2">
-              <span id="tooltip-title" class="font-headline font-black text-xs uppercase px-2 py-0.5 border-[2px] border-black bg-secondary">😈 WORST MATCH</span>
-              <button id="btn-close-tooltip" class="text-xl font-bold leading-none hover:text-error">&times;</button>
-            </div>
-            <p id="tooltip-content" class="text-xs font-bold mb-3 leading-relaxed text-black">추천 코멘트 내용</p>
-            <div class="flex gap-2">
-              <a id="link-shopping" href="" target="_blank" class="flex-1 bg-cream border-[2px] border-black p-2 font-bold text-center text-xs neo-shadow hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all flex items-center justify-center gap-1">
-                무신사 추천 검색 <span class="material-symbols-outlined text-xs">open_in_new</span>
-              </a>
-              <button id="btn-apply-advice" class="flex-1 bg-secondary border-[2px] border-black p-2 font-bold text-center text-xs neo-shadow hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all">
-                추천 코디 적용 ⚡
-              </button>
-            </div>
+        </div>
+
+        <!-- 이미지 바로 아래에 배치하는 친절한 인터랙션 가이드 팁 -->
+        <div id="pin-interaction-guide" class="w-full text-center py-2.5 bg-white border-b-[3px] border-black text-[10px] font-black text-on-surface-variant flex items-center justify-center gap-1 select-none">
+          <span class="animate-bounce text-xs">💡</span> OOTD 위의 😇 베스트 / 😈 워스트 아이콘을 탭해 피드백을 확인하세요!
+        </div>
+
+        <!-- 핀 클릭 피드백 툴팁 박스 (이미지를 가리지 않도록 이미지 박스 아래에 배치) -->
+        <div id="feedback-tooltip" class="w-full bg-[#fff9e6] border-b-[3px] border-black p-5 hidden transition-all duration-300">
+          <div class="flex justify-between items-start mb-2">
+            <span id="tooltip-title" class="font-headline font-black text-xs uppercase px-2 py-0.5 border-[2px] border-black bg-secondary text-black">😈 WORST MATCH</span>
+            <button id="btn-close-tooltip" class="text-xl font-bold leading-none hover:text-error">&times;</button>
+          </div>
+          <p id="tooltip-content" class="text-xs font-bold mb-3 leading-relaxed text-black">추천 코멘트 내용</p>
+          <div class="flex gap-2">
+            <a id="link-shopping" href="" target="_blank" class="flex-1 bg-white border-[2px] border-black p-3 font-bold text-center text-xs neo-shadow hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all flex items-center justify-center gap-1 text-black">
+              무신사 추천 검색 <span class="material-symbols-outlined text-xs">open_in_new</span>
+            </a>
+            <button id="btn-apply-advice" class="flex-1 bg-secondary border-[2px] border-black p-3 font-headline font-black text-xs uppercase neo-shadow hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all text-black">
+              추천 코디 적용 ⚡
+            </button>
           </div>
         </div>
 

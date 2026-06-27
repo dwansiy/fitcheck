@@ -124,3 +124,18 @@ section.active-screen {
 .hidden {
   display: none !important;
 }
+
+/* 10. Neo-Brutalist Pin Pulse (그림자 맥박 애니메이션으로 인지 가능성 비약적 향상) */
+@keyframes neo-pin-pulse {
+  0%, 100% {
+    box-shadow: 4px 4px 0px 0px #000000;
+  }
+  50% {
+    box-shadow: 7px 7px 0px 0px #000000;
+    transform: scale(1.05) translate(-1.5px, -1.5px);
+  }
+}
+
+#pin-angel, #pin-devil {
+  animation: neo-pin-pulse 2.2s infinite ease-in-out;
+}

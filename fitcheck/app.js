@@ -100,7 +100,8 @@ const dom = {
   btnCloseMusinsaModal: document.getElementById('btn-close-musinsa-modal'),
   btnCloseMusinsaModalCancel: document.getElementById('btn-close-musinsa-modal-cancel'),
   btnConfirmMusinsaRedirect: document.getElementById('btn-confirm-musinsa-redirect'),
-  musinsaItemName: document.getElementById('musinsa-item-name')
+  musinsaItemName: document.getElementById('musinsa-item-name'),
+  pinInteractionGuide: document.getElementById('pin-interaction-guide')
 };
 
 // ========================================================
@@ -369,6 +370,7 @@ function calculateFashionResults() {
     dom.pinDevil.classList.add('hidden');
     dom.feedbackTooltip.classList.add('hidden');
     if (dom.resultTopOverlayBadge) dom.resultTopOverlayBadge.classList.add('hidden');
+    if (dom.pinInteractionGuide) dom.pinInteractionGuide.classList.add('hidden');
 
     // 상대방 스펙 바인딩
     dom.vsOppScore.textContent = `${state.opponentScore.toLocaleString()}점`;
@@ -405,6 +407,7 @@ function calculateFashionResults() {
     // Angel & Devil 핀 배치 및 내용 세팅
     setupPins();
     if (dom.resultTopOverlayBadge) dom.resultTopOverlayBadge.classList.remove('hidden');
+    if (dom.pinInteractionGuide) dom.pinInteractionGuide.classList.remove('hidden');
   }
 
   // 점수판 그리기 및 카운트업
@@ -436,6 +439,10 @@ function showPinTooltip(type) {
   playSound('select');
 
   if (type === 'angel') {
+    // 활성 상태 핀 하이라이트 부여
+    dom.pinAngel.classList.add('ring-[5px]', 'ring-black', 'scale-110');
+    dom.pinDevil.classList.remove('ring-[5px]', 'ring-black', 'scale-110');
+
     dom.tooltipTitle.textContent = "😇 BEST MATCH";
     dom.tooltipTitle.className = "font-headline font-black text-xs uppercase px-2 py-0.5 border-[2px] border-black bg-secondary text-black";
     dom.tooltipContent.textContent = "전반적으로 핏의 실루엣 조합과 상체 라인 조화가 우수합니다! 😇";
@@ -444,6 +451,10 @@ function showPinTooltip(type) {
     dom.linkShopping.classList.add('hidden');
     dom.btnApplyAdvice.classList.add('hidden');
   } else {
+    // 활성 상태 핀 하이라이트 부여
+    dom.pinDevil.classList.add('ring-[5px]', 'ring-black', 'scale-110');
+    dom.pinAngel.classList.remove('ring-[5px]', 'ring-black', 'scale-110');
+
     dom.tooltipTitle.textContent = "😈 WORST MATCH";
     dom.tooltipTitle.className = "font-headline font-black text-xs uppercase px-2 py-0.5 border-[2px] border-black bg-error-container text-black";
     
@@ -463,10 +474,21 @@ function showPinTooltip(type) {
       dom.btnApplyAdvice.classList.remove('hidden');
     }
   }
+
+  // 소형 모바일 화면 대응: 피드백 창이 열릴 때 화면 아래로 잘리지 않도록 뷰포트 내로 자동 스크롤 연동
+  setTimeout(() => {
+    if (dom.feedbackTooltip) {
+      dom.feedbackTooltip.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, 80);
 }
 
 function hideTooltip() {
   dom.feedbackTooltip.classList.add('hidden');
+  
+  // 모든 핀 활성 상태 하이라이트 제거
+  dom.pinAngel.classList.remove('ring-[5px]', 'ring-black', 'scale-110');
+  dom.pinDevil.classList.remove('ring-[5px]', 'ring-black', 'scale-110');
 }
 
 // 추천 코디 적용 (실시간 Rescoring 및 가상 대체)
