@@ -4,7 +4,7 @@
   "description": "FitBattle - OOTD Combat Power Arena",
   "main": "index.html",
   "scripts": {
-    "dev": "vite --host",
+    "dev": "npm run dev --prefix fitcheck",
     "build": "npm install --prefix fitcheck && npm run build --prefix fitcheck",
     "preview": "vite preview"
   },
