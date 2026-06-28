@@ -101,27 +101,33 @@
       <!-- TPO 상황선택 칩 -->
       <div class="w-full flex flex-col gap-3">
         <h3 class="font-headline text-lg font-black uppercase pl-1">상황(TPO) 선택:</h3>
-        <div class="flex overflow-x-auto gap-3 pb-3 hide-scroll snap-x">
-          <button class="tpo-chip snap-start shrink-0 bg-white border-[3px] border-black px-6 py-3 min-w-[100px] font-bold text-sm transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]" data-tpo="일상">
-            일상 ☕
-          </button>
-          <button class="tpo-chip snap-start shrink-0 bg-white border-[3px] border-black px-6 py-3 min-w-[100px] font-bold text-sm transition-all" data-tpo="데이트">
-            데이트 💘
-          </button>
-          <button class="tpo-chip snap-start shrink-0 bg-white border-[3px] border-black px-6 py-3 min-w-[100px] font-bold text-sm transition-all" data-tpo="출근">
-            출근 💼
-          </button>
-          <button class="tpo-chip snap-start shrink-0 bg-white border-[3px] border-black px-6 py-3 min-w-[100px] font-bold text-sm transition-all" data-tpo="운동">
-            운동 🏋️
-          </button>
-          <button class="tpo-chip snap-start shrink-0 bg-white border-[3px] border-black px-6 py-3 min-w-[100px] font-bold text-sm transition-all" data-tpo="하객">
-            하객 🤝
-          </button>
+        <div class="relative">
+          <div id="tpo-scroll-container" class="flex overflow-x-auto gap-3 pb-3 hide-scroll snap-x">
+            <button type="button" class="tpo-chip snap-start shrink-0 bg-white border-[3px] border-black px-6 py-3 min-w-[100px] font-bold text-sm transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]" data-tpo="일상">
+              일상 ☕
+            </button>
+            <button type="button" class="tpo-chip snap-start shrink-0 bg-white border-[3px] border-black px-6 py-3 min-w-[100px] font-bold text-sm transition-all" data-tpo="데이트">
+              데이트 💘
+            </button>
+            <button type="button" class="tpo-chip snap-start shrink-0 bg-white border-[3px] border-black px-6 py-3 min-w-[100px] font-bold text-sm transition-all" data-tpo="출근">
+              출근 💼
+            </button>
+            <button type="button" class="tpo-chip snap-start shrink-0 bg-white border-[3px] border-black px-6 py-3 min-w-[100px] font-bold text-sm transition-all" data-tpo="운동">
+              운동 🏋️
+            </button>
+            <button type="button" class="tpo-chip snap-start shrink-0 bg-white border-[3px] border-black px-6 py-3 min-w-[100px] font-bold text-sm transition-all" data-tpo="하객">
+              하객 🤝
+            </button>
+          </div>
+          <!-- PC 우측 스크롤 인디케이터 -->
+          <div id="tpo-scroll-hint" class="absolute right-0 top-0 h-[calc(100%-12px)] w-10 pointer-events-none flex items-center justify-end pr-1" style="background: linear-gradient(to right, transparent, #eae6ff 80%);">
+            <span class="text-black font-black text-lg leading-none">›</span>
+          </div>
         </div>
       </div>
 
       <!-- 패션력 측정하기 대형 액션 버튼 (두껍게 조정 py-6, text-2xl) -->
-      <button id="btn-submit-scan" class="w-full mt-4 bg-tertiary border-[3px] border-black neo-shadow px-6 py-6 transform rotate-[1deg] hover:bg-white active:translate-x-1 active:translate-y-1 active:shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none" disabled>
+      <button type="button" id="btn-submit-scan" class="w-full mt-4 bg-tertiary border-[3px] border-black neo-shadow px-6 py-6 transform rotate-[1deg] hover:bg-white active:translate-x-1 active:translate-y-1 active:shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none" disabled>
         <span class="font-headline text-2xl font-black uppercase text-black">패션력 측정하기</span>
       </button>
       <p class="text-[11px] leading-relaxed text-black/70 text-center px-2">

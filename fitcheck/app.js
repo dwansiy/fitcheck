@@ -128,7 +128,9 @@ const dom = {
   btnCloseMusinsaModalCancel: document.getElementById('btn-close-musinsa-modal-cancel'),
   btnConfirmMusinsaRedirect: document.getElementById('btn-confirm-musinsa-redirect'),
   musinsaItemName: document.getElementById('musinsa-item-name'),
-  pinInteractionGuide: document.getElementById('pin-interaction-guide')
+  pinInteractionGuide: document.getElementById('pin-interaction-guide'),
+  tpoScrollContainer: document.getElementById('tpo-scroll-container'),
+  tpoScrollHint: document.getElementById('tpo-scroll-hint')
 };
 
 // ========================================================
@@ -229,6 +231,25 @@ function bindEvents() {
 
   // 9. 배틀 링크 복사
   if (dom.btnCopyLink) dom.btnCopyLink.addEventListener('click', copyBattleLink);
+
+  // TPO 스크롤 - PC 마우스 휠로 수평 스크롤 지원 + 힌트 화살표 숨김
+  if (dom.tpoScrollContainer) {
+    dom.tpoScrollContainer.addEventListener('wheel', (e) => {
+      if (e.deltaY !== 0) {
+        e.preventDefault();
+        dom.tpoScrollContainer.scrollLeft += e.deltaY;
+      }
+    }, { passive: false });
+
+    const updateScrollHint = () => {
+      if (!dom.tpoScrollHint) return;
+      const el = dom.tpoScrollContainer;
+      const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 4;
+      dom.tpoScrollHint.style.opacity = atEnd ? '0' : '1';
+    };
+    dom.tpoScrollContainer.addEventListener('scroll', updateScrollHint);
+    updateScrollHint();
+  }
 
   // 10. 인스타 바로가기 모달 연동
   if (dom.btnCloseRedirectModal) {
