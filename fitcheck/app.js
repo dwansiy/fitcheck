@@ -84,6 +84,7 @@ const dom = {
   instagramRedirectModal: document.getElementById('instagram-redirect-modal'),
   btnCloseRedirectModal: document.getElementById('btn-close-redirect-modal'),
   btnOpenInstagramApp: document.getElementById('btn-open-instagram-app'),
+  instagramPreviewImg: document.getElementById('instagram-preview-img'),
 
   // 배틀 모드 관련 추가 DOM
   battleChallengeCard: document.getElementById('battle-challenge-card'),
@@ -1397,6 +1398,12 @@ function exportInstagramStory() {
   setTimeout(() => {
     try {
       const dataUrl = canvas.toDataURL('image/png');
+      
+      // 모달에 미리보기 이미지 설정
+      if (dom.instagramPreviewImg) {
+        dom.instagramPreviewImg.src = dataUrl;
+      }
+
       const downloadLink = document.createElement('a');
       downloadLink.download = `fitcheck_ootd_${state.score}.png`;
       downloadLink.href = dataUrl;
