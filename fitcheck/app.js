@@ -1133,7 +1133,7 @@ function exportInstagramStory() {
   ctx.fillText(state.isBattleMode ? 'FITCHECK! BATTLE' : 'FITCHECK! VERDICT', 540, 150);
 
   // 4. OOTD 사진 그리기 (일반 모드는 1:1, 배틀 모드는 5:5 분할 드로잉)
-  const imgElement = dom.resultOotdImgChallenger.src ? dom.resultOotdImgChallenger : dom.resultOotdImg;
+  const imgElement = state.isBattleMode ? dom.resultOotdImgChallenger : dom.resultOotdImg;
   const imgWidth = 650;
   const imgHeight = 650;
   const imgX = (1080 - imgWidth) / 2; // 215
