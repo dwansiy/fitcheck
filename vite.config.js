@@ -1,8 +1,10 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  root: 'fitcheck',
+  base: '/',
   build: {
-    outDir: 'dist',
+    outDir: '../dist',
     emptyOutDir: true,
     sourcemap: false,
   },
