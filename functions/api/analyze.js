@@ -1,138 +1,104 @@
-export async function onRequestPost(context) {
+const ALLOWED_TPOS = new Set(['일상', '데이트', '출근', '운동', '하객']);
+const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const STAT_NAMES = {
+  일상: ['색상 조화', '실루엣', '활용도', '편안함', '완성도'],
+  데이트: ['호감도', '센스', '분위기', '자신감', '완성도'],
+  출근: ['단정함', '전문성', '활동성', '신뢰감', '완성도'],
+  운동: ['기능성', '활동성', '쾌적함', '실루엣', '완성도'],
+  하객: ['격식', '배려', '사진발', '세련미', '완성도'],
+};
+const MODEL = 'gemini-3.1-flash-lite';
+const MAX_BODY_BYTES = 4_500_000;
+
+const json = (data, status = 200) => new Response(JSON.stringify(data), {
+  status,
+  headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
+});
+
+export async function onRequestPost({ request, env }) {
+  if (!env.GEMINI_API_KEY) return json({ error: '서버 API 키가 설정되지 않았습니다.' }, 503);
+  const declaredLength = Number(request.headers.get('content-length') || 0);
+  if (declaredLength > MAX_BODY_BYTES) return json({ error: '이미지 요청 크기가 너무 큽니다.' }, 413);
+
   try {
-    const { request, env } = context;
-    const apiKey = env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return new Response(JSON.stringify({ error: "Gemini API Key is not configured on the server." }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
     const body = await request.json();
-    const { imageBase64, tpo, model } = body;
+    const input = validateInput(body);
+    if (!input.ok) return json({ error: input.error }, 400);
 
-    if (!imageBase64 || !tpo) {
-      return new Response(JSON.stringify({ error: "Missing required parameters (imageBase64, tpo)." }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    const geminiModel = model || 'gemini-3.1-flash-lite';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`;
-
-    const base64Parts = imageBase64.split(',');
-    const base64Data = base64Parts[1];
-    const mimeType = base64Parts[0].split(';')[0].split(':')[1];
-
-    const prompt = `
-당신은 트렌디하고 위트 있으며 뼈 때리는 패션 비평가인 'FitCheck 마스터'입니다.
-사용자가 제출한 OOTD 사진과 상황(TPO)을 바탕으로 패션력을 평가하고 JSON 형식으로 응답해 주세요.
-
-[TPO 상황]
-${tpo}
-
-[분석 및 응답 기준]
-1. 패션력 점수(score): 0 ~ 10,000점 범위로 정수로만 평가해 주세요.
-2. 티어(tier): 점수에 따라 다음 5개 중 정확히 매칭되는 티어 텍스트를 할당해 주세요.
-   - 9000점 이상: "패션 챌린저"
-   - 7500점 이상 9000점 미만: "다이아몬드"
-   - 6000점 이상 7500점 미만: "골드"
-   - 4000점 이상 6000점 미만: "실버"
-   - 4000점 미만: "아이언"
-3. 한줄평(roast): 점수와 상황(TPO)에 어울리는 위트 있고 직설적인 한줄평 (100~150자 내외). 점수가 낮을수록 뼈 때리는 매운맛(savage roast)이어야 하고, 높을수록 힙하고 시크한 칭찬이어야 합니다. 반드시 150자를 넘지 않도록 간결하게 끝내주세요.
-4. 베스트 매치(bestMatch):
-   - name: 착장에서 가장 조화롭고 잘 어울리는 특정 아이템/부위에 대한 설명 (예: "와이드 카키 데님 팬츠: 루즈한 상의 핏과 완벽한 톤온톤 매치")
-   - x: 해당 부위의 이미지 상 가로 위치 백분율 (0~100 사이 정수값, 핀 마킹 위치)
-   - y: 해당 부위의 이미지 상 세로 위치 백분율 (0~100 사이 정수값, 핀 마킹 위치)
-5. 워스트 매치(worstMatch):
-   - name: 착장에서 가장 어색하거나 교체하고 싶은 특정 아이템/부위에 대한 지적 및 코디 보완 설명 (예: "투박한 회색 운동화: 전체적인 캐주얼 미니멀 무드에 찬물을 끼얹는 언밸런스. 심플한 독일군 스니커즈로 변경 추천")
-   - recommendItem: 대체 추천하는 단품 패션 아이템 이름 (예: "독일군 스니커즈"). 이 추천 명칭은 무신사 쇼핑몰에서 상품 검색이 바로 가능한 직관적인 한글 명사여야 합니다.
-   - x: 해당 부위의 이미지 상 가로 위치 백분율 (0~100 사이 정수값, 핀 마킹 위치)
-   - y: 해당 부위의 이미지 상 세로 위치 백분율 (0~100 사이 정수값, 핀 마킹 위치)
-6. 무신사 검색어(musinsaQuery): worstMatch.recommendItem과 매치되는 검색용 핵심 단어 (예: "독일군 스니커즈")
-7. 상세 스탯(stats): 선택된 TPO 상황에 맞춰 지정된 5개 스탯 항목들의 개별 점수(0~100 사이 정수)를 매겨 주세요. 스탯 항목 이름(Key)은 반드시 오타 없이 아래에 정의된 5개 이름 그대로 사용해야 합니다.
-
-[상황별 스탯 정의 (반드시 해당하는 TPO의 Key 이름을 매핑해 주세요)]
-- 일상: {"색상 불협화음 🎨": 점수, "안구 보호도 👁️": 점수, "근자감 농도 ⚡": 점수, "지갑 방어력 💸": 점수, "마실 적합도 ☕": 점수}
-- 데이트: {"설렘 유발 지수 💘": 점수, "과도한 격식도 🕴️": 점수, "센스 스포일러 🕶️": 점수, "호감도 파괴력 💔": 점수, "데이트 생존율 🧬": 점수}
-- 출근: {"부장님 눈총 지수 😒": 점수, "프로페셔널 지수 💼": 점수, "활동성 방해율 🏃": 점수, "퇴근 본능 자극도 ⏰": 점수, "평판 수호 지수 🛡️": 점수}
-- 운동: {"헬창 아우라 지수 🏋️": 점수, "거울 셀카 득표율 📸": 점수, "땀 배출 지연도 💦": 점수, "신체 보정 치트 📐": 점수, "근손실 위장도 🧬": 점수}
-- 하객: {"신부 저격 민폐도 🏹": 점수, "하객 격식 비율 🤝": 점수, "사진 생존율 📸": 점수, "피로연 프리패스 🍽️": 점수, "친척 잔소리 실드 🛡️": 점수}
-
-반드시 백틱(\`\`\`)이나 마크다운 마크업 없는 순수한 JSON 객체 형식으로만 응답해야 하며, 다음 JSON 스키마를 완벽히 준수해야 합니다:
-{
-  "score": number,
-  "tier": string,
-  "roast": string,
-  "bestMatch": {
-    "name": string,
-    "x": number,
-    "y": number
-  },
-  "worstMatch": {
-    "name": string,
-    "recommendItem": string,
-    "x": number,
-    "y": number
-  },
-  "musinsaQuery": string,
-  "stats": {
-    "키이름1": number,
-    "키이름2": number,
-    "키이름3": number,
-    "키이름4": number,
-    "키이름5": number
-  }
-}
-`;
-
-    const requestBody = {
-      contents: [
-        {
-          parts: [
-            { text: prompt },
-            {
-              inlineData: {
-                mimeType: mimeType,
-                data: base64Data
-              }
-            }
-          ]
-        }
-      ],
-      generationConfig: {
-        responseMimeType: "application/json"
-      }
-    };
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
+        body: JSON.stringify(createGeminiRequest(input.value)),
       },
-      body: JSON.stringify(requestBody)
-    });
+    );
 
     if (!response.ok) {
-      const errorText = await response.text();
-      return new Response(JSON.stringify({ error: `Gemini API failed: ${errorText}` }), {
-        status: response.status,
-        headers: { "Content-Type": "application/json" }
-      });
+      console.error('Gemini request failed', response.status, await response.text());
+      return json({ error: 'AI 분석 서비스가 응답하지 않았습니다.' }, 502);
     }
-
-    const json = await response.json();
-    const text = json.candidates[0].content.parts[0].text;
-
-    return new Response(text, {
-      headers: { "Content-Type": "application/json" }
-    });
+    const payload = await response.json();
+    const raw = payload.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!raw) return json({ error: 'AI 분석 결과가 비어 있습니다.' }, 502);
+    const result = validateResult(JSON.parse(raw), input.value.tpo);
+    return result.ok ? json(result.value) : json({ error: 'AI 분석 결과 형식이 올바르지 않습니다.' }, 502);
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
+    console.error('Analyze handler failed', error instanceof Error ? error.message : error);
+    return json({ error: '요청을 처리하지 못했습니다.' }, 500);
   }
+}
+
+export function onRequestGet() {
+  return json({ error: '허용되지 않은 요청 방식입니다.' }, 405);
+}
+
+function validateInput(body) {
+  if (!body || typeof body !== 'object' || !ALLOWED_TPOS.has(body.tpo) || typeof body.image !== 'string') return { ok: false, error: '사진과 올바른 TPO를 입력해 주세요.' };
+  if (body.image.length > MAX_BODY_BYTES) return { ok: false, error: '이미지 요청 크기가 너무 큽니다.' };
+  const match = body.image.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+  if (!match || !ALLOWED_MIME_TYPES.has(match[1])) return { ok: false, error: '지원하지 않는 이미지 형식입니다.' };
+  return { ok: true, value: { tpo: body.tpo, mimeType: match[1], data: match[2] } };
+}
+
+function createGeminiRequest({ tpo, mimeType, data }) {
+  const statProperties = Object.fromEntries(STAT_NAMES[tpo].map((name) => [name, { type: 'INTEGER', minimum: 0, maximum: 100 }]));
+  return {
+    contents: [{ parts: [{ text: promptFor(tpo) }, { inlineData: { mimeType, data } }] }],
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'OBJECT',
+        required: ['score', 'tier', 'roast', 'bestMatch', 'worstMatch', 'stats'],
+        properties: {
+          score: { type: 'INTEGER', minimum: 0, maximum: 10000 },
+          tier: { type: 'STRING' },
+          roast: { type: 'STRING' },
+          bestMatch: { type: 'OBJECT', required: ['name', 'x', 'y'], properties: { name: { type: 'STRING' }, x: { type: 'INTEGER' }, y: { type: 'INTEGER' } } },
+          worstMatch: { type: 'OBJECT', required: ['name', 'recommendItem', 'x', 'y'], properties: { name: { type: 'STRING' }, recommendItem: { type: 'STRING' }, x: { type: 'INTEGER' }, y: { type: 'INTEGER' } } },
+          stats: { type: 'OBJECT', required: STAT_NAMES[tpo], properties: statProperties },
+        },
+      },
+    },
+  };
+}
+
+function promptFor(tpo) {
+  return `당신은 한국 패션 스타일리스트입니다. 사용자가 업로드한 OOTD를 '${tpo}' 상황 적합성, 색 조합, 실루엣, 소재 조화, 완성도로 평가하세요. 외모나 신체를 비하하지 말고 옷과 스타일만 다루세요. score는 0~10000 정수입니다. tier는 9000 이상 '패션 챌린저', 7500 이상 '다이아몬드', 6000 이상 '골드', 4000 이상 '실버', 나머지는 '아이언'으로 정확히 정하세요. roast는 재치 있지만 유용한 한국어 피드백 100자 안팎입니다. bestMatch와 worstMatch는 사진 속 구체적 의상 부위의 설명과 해당 위치 x,y(각 5~95)를 담으세요. recommendItem은 보완할 구체적 패션 아이템입니다. stats는 이 상황에 적합한 서로 다른 한국어 항목 정확히 5개와 0~100 정수 점수로 구성하세요.`;
+}
+
+function validateResult(value, tpo) {
+  const isPoint = (point, recommendation = false) => point && typeof point.name === 'string' && (!recommendation || typeof point.recommendItem === 'string') && Number.isInteger(point.x) && point.x >= 5 && point.x <= 95 && Number.isInteger(point.y) && point.y >= 5 && point.y <= 95;
+  const stats = value?.stats && Object.entries(value.stats);
+  const expectedStats = STAT_NAMES[tpo];
+  if (!value || !Number.isInteger(value.score) || value.score < 0 || value.score > 10000 || typeof value.roast !== 'string' || value.roast.length > 500 || !isPoint(value.bestMatch) || !isPoint(value.worstMatch, true) || !stats || stats.length !== 5 || stats.some(([key, val]) => !expectedStats.includes(key) || !Number.isInteger(val) || val < 0 || val > 100)) return { ok: false };
+  return { ok: true, value: { ...value, tier: tierFor(value.score) } };
+}
+
+function tierFor(score) {
+  if (score >= 9000) return '패션 챌린저';
+  if (score >= 7500) return '다이아몬드';
+  if (score >= 6000) return '골드';
+  if (score >= 4000) return '실버';
+  return '아이언';
 }
