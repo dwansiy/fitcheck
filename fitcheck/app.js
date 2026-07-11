@@ -1394,7 +1394,21 @@ function exportInstagramStory() {
   ctx.font = 'bold 26px Lexend, sans-serif';
   ctx.fillText(state.isBattleMode ? '대결을 수락하고 덤벼라! @team.letsgo_fit' : '내 친구들은 몇점? @team.letsgo_fit', 540, 1850);
 
-  // 9. 이미지 다운로드 트리거 및 모달 오픈
+  // 9. 공유 파일에는 결과 화면이나 스토리 카드가 아닌 업로드 사진만 담는다.
+  // 고해상도 원본으로 인한 모바일 메모리 문제를 막기 위해 긴 변을 제한한다.
+  const shareImage = state.isBattleMode ? dom.resultOotdImgChallenger : dom.resultOotdImg;
+  const sourceWidth = shareImage.naturalWidth || shareImage.width;
+  const sourceHeight = shareImage.naturalHeight || shareImage.height;
+  const maxShareDimension = 2160;
+  const scale = Math.min(1, maxShareDimension / Math.max(sourceWidth, sourceHeight));
+
+  canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+  canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(shareImage, 0, 0, canvas.width, canvas.height);
+
+  // 10. 이미지 다운로드 트리거 및 모달 오픈
   setTimeout(() => {
     try {
       const dataUrl = canvas.toDataURL('image/png');
@@ -1410,7 +1424,7 @@ function exportInstagramStory() {
       document.body.appendChild(downloadLink);
       downloadLink.click();
       document.body.removeChild(downloadLink);
-      showToast("공유용 카드가 이미지 파일로 다운로드되었습니다! 💾");
+      showToast("업로드한 사진이 이미지 파일로 다운로드되었습니다! 💾");
       playSound('download');
 
       // 모달 오버레이 오픈 (사용자 인스타 연동 UX)
