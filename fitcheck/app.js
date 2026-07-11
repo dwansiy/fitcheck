@@ -297,8 +297,7 @@ async function callAnalyzeAPI(imageBase64, tpo) {
       },
       body: JSON.stringify({
         imageBase64,
-        tpo,
-        model: 'gemini-3.1-flash-lite'
+        tpo
       })
     });
 
@@ -314,9 +313,10 @@ async function callAnalyzeAPI(imageBase64, tpo) {
 
   // 2단계: 로컬 개발 환경용 클라이언트 직접 호출 (Vite VITE_GEMINI_API_KEY 변수 사용)
   const localApiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (localApiKey) {
+  const localModel = import.meta.env.VITE_AI_OUTFIT_ANALYSIS_MODEL;
+  if (localApiKey && localModel) {
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${localApiKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(localModel)}:generateContent?key=${localApiKey}`;
       
       const base64Parts = imageBase64.split(',');
       const base64Data = base64Parts[1];
@@ -703,9 +703,40 @@ function hideTooltip() {
 }
 
 // 추천 코디 적용 (실시간 Rescoring 및 가상 대체)
-function applyStyleAdvice() {
+async function applyStyleAdvice() {
   if (state.isPatched) return;
+
+  dom.btnApplyAdvice.disabled = true;
+  showToast('AI가 추천 아이템을 자연스럽게 적용하고 있습니다... ✨');
+
+  try {
+    const preparedImage = await prepareImageForStyleEdit(state.currentOotdImage);
+    const response = await fetch('/api/apply-style', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        imageBase64: preparedImage.dataUrl,
+        width: preparedImage.originalWidth,
+        height: preparedImage.originalHeight,
+        recommendation: state.targetMusinsaItem,
+        feedback: state.worstMatch?.name || '',
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.image) throw new Error(payload.error || '이미지 개선에 실패했습니다.');
+
+    const resultImage = state.isBattleMode ? dom.resultOotdImgChallenger : dom.resultOotdImg;
+    resultImage.src = payload.image;
+    await resultImage.decode();
+    state.currentOotdImage = payload.image;
+  } catch (error) {
+    showToast(error.message || '이미지 개선에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+    dom.btnApplyAdvice.disabled = false;
+    return;
+  }
+
   state.isPatched = true;
+  dom.btnApplyAdvice.disabled = false;
   hideTooltip();
 
   // 1. 보너스 스코어 획득 플로팅 연출
@@ -777,6 +808,28 @@ function applyStyleAdvice() {
   setTimeout(() => {
     dom.bonusScoreBadge.classList.add('hidden');
   }, 2200);
+}
+
+async function prepareImageForStyleEdit(dataUrl) {
+  const image = new Image();
+  image.src = dataUrl;
+  await image.decode();
+
+  const maxInputDimension = 496;
+  const scale = Math.min(1, maxInputDimension / Math.max(image.naturalWidth, image.naturalHeight));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const context = canvas.getContext('2d');
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+  return {
+    dataUrl: canvas.toDataURL('image/jpeg', 0.88),
+    originalWidth: image.naturalWidth,
+    originalHeight: image.naturalHeight,
+  };
 }
 
 // 점수판 및 스탯 렌더링 총괄

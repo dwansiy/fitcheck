@@ -1,30 +1,22 @@
+import { AI_FEATURES, resolveAiModel } from '../_lib/ai/models.js';
+import { runAiModel } from '../_lib/ai/run.js';
+import { json as jsonResponse, parseDataUrl } from '../_lib/http.js';
+
+const ALLOWED_TPOS = new Set(['일상', '데이트', '출근', '운동', '하객']);
+
 export async function onRequestPost(context) {
   try {
     const { request, env } = context;
-    const apiKey = env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return new Response(JSON.stringify({ error: "Gemini API Key is not configured on the server." }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
     const body = await request.json();
-    const { imageBase64, tpo, model } = body;
+    const { imageBase64, tpo } = body;
 
-    if (!imageBase64 || !tpo) {
-      return new Response(JSON.stringify({ error: "Missing required parameters (imageBase64, tpo)." }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
+    const image = parseDataUrl(imageBase64);
+    if (!image || !ALLOWED_TPOS.has(tpo)) return jsonResponse({ error: '사진과 올바른 TPO가 필요합니다.' }, 400);
 
-    const geminiModel = model || 'gemini-3.1-flash-lite';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`;
+    const model = resolveAiModel(AI_FEATURES.OUTFIT_ANALYSIS, env);
 
-    const base64Parts = imageBase64.split(',');
-    const base64Data = base64Parts[1];
-    const mimeType = base64Parts[0].split(';')[0].split(':')[1];
+    const base64Data = image.base64;
+    const mimeType = image.mimeType;
 
     const prompt = `
 당신은 트렌디하고 위트 있으며 뼈 때리는 패션 비평가인 'FitCheck 마스터'입니다.
@@ -107,32 +99,14 @@ ${tpo}
       }
     };
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(requestBody)
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return new Response(JSON.stringify({ error: `Gemini API failed: ${errorText}` }), {
-        status: response.status,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    const json = await response.json();
+    const json = await runAiModel(model, env, requestBody);
     const text = json.candidates[0].content.parts[0].text;
 
     return new Response(text, {
       headers: { "Content-Type": "application/json" }
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
+    console.error('Analyze handler failed', error instanceof Error ? error.message : error);
+    return jsonResponse({ error: '패션 분석 요청을 처리하지 못했습니다.' }, 500);
   }
 }
