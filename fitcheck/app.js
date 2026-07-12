@@ -76,8 +76,6 @@ const dom = {
   imageVersionToggle: document.getElementById('image-version-toggle'),
   btnShowBefore: document.getElementById('btn-show-before'),
   btnShowAfter: document.getElementById('btn-show-after'),
-  btnReanalyzeImproved: document.getElementById('btn-reanalyze-improved'),
-  reanalyzeImprovedPanel: document.getElementById('reanalyze-improved-panel'),
   styleEditOverlay: document.getElementById('style-edit-overlay'),
   styleEditStatus: document.getElementById('style-edit-status'),
   styleEditScorePanel: document.getElementById('style-edit-score-panel'),
@@ -214,14 +212,7 @@ function bindEvents() {
 
   // 6. 추천 코디 적용 (Devil 피드백 교체)
   dom.btnApplyAdvice.addEventListener('click', applyStyleAdvice);
-  dom.btnAnalysisRetry.addEventListener('click', () => {
-    if (state.improvedOotdImage && dom.screenResult.classList.contains('active-screen') === false) {
-      reanalyzeImprovedImage();
-    } else {
-      startScanningSequence();
-    }
-  });
-  dom.btnReanalyzeImproved.addEventListener('click', reanalyzeImprovedImage);
+  dom.btnAnalysisRetry.addEventListener('click', startScanningSequence);
   dom.btnShowBefore.addEventListener('click', () => showImageVersion('before'));
   dom.btnShowAfter.addEventListener('click', () => showImageVersion('after'));
 
@@ -640,16 +631,15 @@ function hideTooltip() {
 }
 
 
-function startInlineStyleEdit(recommendItemName, mode = 'edit') {
-  const messages = mode === 'analyze' ? [
-    '개선된 코디를 다시 스캔하는 중...',
-    '새로운 패션력과 티어 계산 중...',
-    '스탯 상승 폭을 비교하는 중...',
-    '최종 성적표 정리 중...',
-  ] : [
+function startInlineStyleEdit(recommendItemName) {
+  const messages = [
     `${recommendItemName} 코디 시뮬레이션 가동 중...`,
-    '새 아이템의 핏과 주름 다듬는 중...',
-    '전체 코디 밸런스 최종 점검 중...',
+    '얼굴과 포즈는 그대로 잠금 완료 🔒',
+    '새 아이템의 핏만 살짝 다듬는 중...',
+    '원래 조명과 배경을 단속하는 중...',
+    '코디 밸런스에 패션 소금 한 꼬집...',
+    '거울 속 새 착장과 눈 맞춤 중...',
+    'TPO 심사위원들이 점수 토론 중...',
     '패션력 재측정 준비 중...',
   ];
   let step = 0;
@@ -660,9 +650,9 @@ function startInlineStyleEdit(recommendItemName, mode = 'edit') {
   dom.styleEditOverlay.classList.remove('hidden');
   dom.styleEditOverlay.classList.add('flex');
   const interval = setInterval(() => {
-    step = Math.min(step + 1, messages.length - 1);
+    step = (step + 1) % messages.length;
     dom.styleEditStatus.textContent = messages[step];
-  }, 1000);
+  }, 1600);
 
   return () => {
     clearInterval(interval);
@@ -681,11 +671,11 @@ function animateInlineScore(from, to) {
   const startedAt = performance.now();
   return new Promise((resolve) => {
     const tick = (now) => {
-      const progress = Math.min(1, (now - startedAt) / 1100);
+      const progress = Math.min(1, (now - startedAt) / 2800);
       const eased = 1 - ((1 - progress) ** 3);
       dom.styleEditScore.textContent = Math.round(from + ((to - from) * eased)).toLocaleString();
       if (progress < 1) requestAnimationFrame(tick);
-      else resolve();
+      else setTimeout(resolve, 700);
     };
     requestAnimationFrame(tick);
   });
@@ -737,11 +727,15 @@ async function applyStyleAdvice() {
       });
       applyImprovedAnalysis(analysis, previousStats);
       await animateInlineScore(previousScore, state.score);
-      dom.reanalyzeImprovedPanel.classList.add('hidden');
     } catch (analysisError) {
       console.warn('Improved image analysis failed.', analysisError);
-      dom.reanalyzeImprovedPanel.classList.remove('hidden');
-      showToast(`${aiErrorMessage(analysisError)} 개선 이미지는 적용됐으니 다시 분석해 주세요.`);
+      resultImage.src = state.originalOotdImage;
+      state.currentOotdImage = state.originalOotdImage;
+      state.improvedOotdImage = null;
+      throw new ApiRequestError(
+        'STYLE_RESULT_ANALYSIS_FAILED',
+        `${aiErrorMessage(analysisError)} 원본으로 되돌렸어요. 잠시 후 다시 개선해 주세요.`,
+      );
     }
     finishLoading();
   } catch (error) {
@@ -765,7 +759,7 @@ async function applyStyleAdvice() {
   dom.improvedShoppingCard.classList.remove('hidden');
   dom.pinInteractionGuide.classList.add('hidden');
   showImageVersion('after');
-  showToast('코디 적용 완료! 결과가 자연스러운지 확인한 뒤 다시 분석해 주세요. ✨');
+  showToast('코디 적용 완료! BEFORE / AFTER로 변신을 확인해 보세요. ✨');
 }
 
 function showImageVersion(version) {
@@ -796,33 +790,6 @@ function applyImprovedAnalysis(analysis, previousStats) {
   dom.resultTierName.textContent = state.tier;
   dom.resultRoastText.textContent = analysis.roast;
   renderVibeStats();
-}
-
-async function reanalyzeImprovedImage() {
-  if (!state.improvedOotdImage) return;
-  const previousScore = state.score;
-  const previousStats = new Map(state.stats.map((stat) => [stat.name, stat.val]));
-  dom.btnReanalyzeImproved.disabled = true;
-  const finishLoading = startInlineStyleEdit(state.targetMusinsaItem, 'analyze');
-
-  try {
-    const analysis = await callAnalyzeAPI(state.improvedOotdImage, state.selectedTpo, {
-      item: state.targetMusinsaItem,
-      previousScore,
-    });
-    applyImprovedAnalysis(analysis, previousStats);
-    await animateInlineScore(previousScore, state.score);
-    dom.reanalyzeImprovedPanel.classList.add('hidden');
-    dom.improvedShoppingDescription.textContent = analysis.improvementSummary
-      || `${state.targetMusinsaItem}(으)로 코디 밸런스를 다시 세웠어요. 패션 구조대 임무 완료!`;
-    showToast('개선 이미지 재분석 완료! 새 점수와 UP 스탯을 확인해 보세요. 🎯');
-  } catch (error) {
-    showToast(aiErrorMessage(error));
-    dom.reanalyzeImprovedPanel.classList.remove('hidden');
-  } finally {
-    finishLoading();
-    dom.btnReanalyzeImproved.disabled = false;
-  }
 }
 
 async function prepareImageForStyleEdit(dataUrl) {
@@ -994,8 +961,8 @@ function renderVibeStats() {
   dom.statsContainer.innerHTML = '';
   
   state.stats.forEach((stat, idx) => {
-    // 5대 교차 컬러 배치 (Lavender, Mint, Peach, Cream, White)
-    const colorClasses = ['bg-primary', 'bg-secondary', 'bg-tertiary', 'bg-cream', 'bg-white'];
+    // 5대 교차 컬러 배치 (Lavender, Mint, Peach, Cream, Deep Lavender)
+    const colorClasses = ['bg-primary', 'bg-secondary', 'bg-tertiary', 'bg-cream', 'bg-[#c9c1ff]'];
     const barColor = colorClasses[idx % colorClasses.length];
     const baseline = Math.min(stat.originalVal, stat.val);
     const gain = Math.max(0, stat.val - baseline);
@@ -1110,7 +1077,6 @@ function resetToUploadScreen() {
   state.isPatched = false;
   state.apiData = null; // API 데이터 리셋
   dom.imageVersionToggle.classList.add('hidden');
-  dom.reanalyzeImprovedPanel.classList.add('hidden');
   dom.improvedShoppingCard.classList.add('hidden');
   dom.styleEditOverlay.classList.add('hidden');
   dom.styleEditOverlay.classList.remove('flex');

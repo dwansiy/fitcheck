@@ -46,14 +46,16 @@ function cleanText(value, maxLength) {
 
 function buildEditPrompt(recommendation, feedback) {
   return [
+    'NON-NEGOTIABLE EDIT BOUNDARY: edit clothing pixels only. Identity and anatomy preservation overrides every other instruction.',
     'Perform a strictly localized fashion garment replacement on input image 0.',
     `Replace only the criticized clothing item with: ${recommendation}. Change pixels only where that garment exists.`,
     feedback ? `Styling context: ${feedback}.` : '',
-    'ABSOLUTE IDENTITY LOCK: preserve the exact same person and identity. Never modify, regenerate, beautify, retouch, or reinterpret the face, facial features, expression, eyes, nose, mouth, ears, hair, skin, skin tone, neck, hands, fingers, body, body proportions, body shape, height, weight, pose, or anatomy.',
+    'ABSOLUTE IDENTITY LOCK: copy the original face, head, hair, skin, neck, hands, fingers, body, silhouette, proportions, pose, and anatomy pixel-for-pixel. Never modify, regenerate, redraw, beautify, retouch, reinterpret, or relight any of them.',
     'Preserve the exact original silhouette and physical boundaries of the person. The replacement garment must conform to the existing body and pose; the body must never conform to the new garment.',
     'Preserve camera angle, crop, perspective, lighting, shadows, background, surrounding objects, accessories, and every garment not explicitly requested.',
-    'If the requested garment cannot be replaced without changing the face or body, leave the protected person pixels unchanged and make only the safest minimal garment edit.',
+    'If the requested garment cannot be replaced without changing even one protected face or body detail, do not perform that conflicting change. Leave all protected pixels unchanged and make only the safest minimal garment edit.',
     'Keep the result photorealistic. Do not add text, logos, borders, stickers, extra people, or accessories not requested.',
+    'FINAL VALIDITY CHECK: any output with a changed face, identity, body, skin, hands, pose, or anatomy is invalid. Restore those regions exactly from input image 0 before returning the result.',
   ].filter(Boolean).join(' ');
 }
 
