@@ -17,11 +17,11 @@ const WORST_MATCH_SCHEMA = Object.freeze({
     reasonTags: {
       type: 'array',
       items: { type: 'string' },
-      minItems: 2,
+      minItems: 1,
       maxItems: 3,
     },
   },
-  required: [...MATCH_SCHEMA.required, 'recommendItem', 'reasonTags'],
+  required: [...MATCH_SCHEMA.required, 'recommendItem'],
 });
 
 export const OUTFIT_RESULT_SCHEMA = Object.freeze({
@@ -31,8 +31,8 @@ export const OUTFIT_RESULT_SCHEMA = Object.freeze({
     score: { type: 'integer', minimum: 0, maximum: 10000 },
     tier: { type: 'string' },
     roast: { type: 'string' },
-    bestMatches: { type: 'array', items: MATCH_SCHEMA, minItems: 3, maxItems: 4 },
-    worstMatches: { type: 'array', items: WORST_MATCH_SCHEMA, minItems: 3, maxItems: 4 },
+    bestMatches: { type: 'array', items: MATCH_SCHEMA, minItems: 1, maxItems: 4 },
+    worstMatches: { type: 'array', items: WORST_MATCH_SCHEMA, minItems: 1, maxItems: 4 },
     musinsaQuery: { type: 'string' },
     stats: {
       type: 'object',
@@ -64,8 +64,52 @@ export function parseOutfitResult(response) {
     throw invalidResponse('Gemini returned invalid JSON.');
   }
 
-  validateOutfitResult(result);
-  return result;
+  const normalized = normalizeOutfitResult(result);
+  validateOutfitResult(normalized);
+  return normalized;
+}
+
+function normalizeOutfitResult(result) {
+  if (!result || typeof result !== 'object') return result;
+
+  const normalizeMatch = (match, withRecommendation = false) => {
+    if (!match || typeof match !== 'object') return null;
+    const normalized = {
+      name: cleanText(match.name),
+      x: boundedInteger(match.x, 0, 100),
+      y: boundedInteger(match.y, 0, 100),
+    };
+    if (withRecommendation) {
+      normalized.recommendItem = cleanText(match.recommendItem);
+      const tags = Array.isArray(match.reasonTags)
+        ? match.reasonTags.map(cleanText).filter(Boolean).slice(0, 3)
+        : [];
+      normalized.reasonTags = tags.length ? tags : ['스타일개선', '추천아이템'];
+    }
+    return normalized;
+  };
+
+  const bestSource = Array.isArray(result.bestMatches)
+    ? result.bestMatches
+    : result.bestMatch ? [result.bestMatch] : [];
+  const worstSource = Array.isArray(result.worstMatches)
+    ? result.worstMatches
+    : result.worstMatch ? [result.worstMatch] : [];
+  const stats = Object.fromEntries(Object.entries(result.stats || {}).slice(0, 5).map(([name, value]) => [
+    cleanText(name),
+    boundedInteger(value, 0, 100),
+  ]));
+
+  const worstMatches = worstSource.map((match) => normalizeMatch(match, true)).filter(Boolean).slice(0, 4);
+  return {
+    score: boundedInteger(result.score, 0, 10000),
+    tier: cleanText(result.tier),
+    roast: cleanText(result.roast),
+    bestMatches: bestSource.map((match) => normalizeMatch(match)).filter(Boolean).slice(0, 4),
+    worstMatches,
+    musinsaQuery: cleanText(result.musinsaQuery) || worstMatches[0]?.recommendItem || '',
+    stats,
+  };
 }
 
 function validateOutfitResult(result) {
@@ -83,15 +127,15 @@ function validateOutfitResult(result) {
     && isNonEmptyText(result.tier)
     && isNonEmptyText(result.roast)
     && Array.isArray(result.bestMatches)
-    && result.bestMatches.length >= 3
+    && result.bestMatches.length >= 1
     && result.bestMatches.length <= 4
     && result.bestMatches.every((match) => isMatch(match))
     && Array.isArray(result.worstMatches)
-    && result.worstMatches.length >= 3
+    && result.worstMatches.length >= 1
     && result.worstMatches.length <= 4
     && result.worstMatches.every((match) => isMatch(match, true)
       && Array.isArray(match.reasonTags)
-      && match.reasonTags.length >= 2
+      && match.reasonTags.length >= 1
       && match.reasonTags.every(isNonEmptyText))
     && isNonEmptyText(result.musinsaQuery)
     && Array.isArray(stats)
@@ -103,5 +147,15 @@ function validateOutfitResult(result) {
 
 function invalidResponse(message) {
   return new AiProviderError(message, 502, AI_ERROR_CODES.INVALID_RESPONSE);
+}
+
+function cleanText(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function boundedInteger(value, min, max) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return Number.NaN;
+  return Math.max(min, Math.min(max, Math.round(number)));
 }
 import { AI_ERROR_CODES, AiProviderError, AiSafetyError } from './errors.js';
