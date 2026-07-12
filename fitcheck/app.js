@@ -30,6 +30,7 @@ const state = {
 
   // AI API 결과 임시 보관
   apiData: null,
+  improvementChanges: [],
 };
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -57,6 +58,7 @@ const dom = {
   imageFileInput: document.getElementById('image-file-input'),
   tpoChips: document.querySelectorAll('.tpo-chip'),
   btnSubmitScan: document.getElementById('btn-submit-scan'),
+  btnTrySample: document.getElementById('btn-try-sample'),
   
   // 로딩 화면
   loadingTitle: document.getElementById('loading-title'),
@@ -89,6 +91,12 @@ const dom = {
   improvedShoppingItem: document.getElementById('improved-shopping-item'),
   improvedShoppingDescription: document.getElementById('improved-shopping-description'),
   improvedShoppingLink: document.getElementById('improved-shopping-link'),
+  improvementChangeSummary: document.getElementById('improvement-change-summary'),
+  improvementChangeItems: document.getElementById('improvement-change-items'),
+  devilSummaryCard: document.getElementById('devil-summary-card'),
+  devilSummaryTitle: document.getElementById('devil-summary-title'),
+  devilSummaryItems: document.getElementById('devil-summary-items'),
+  pinInteractionText: document.getElementById('pin-interaction-text'),
   
   resultScoreNum: document.getElementById('result-score-num'),
   resultTierName: document.getElementById('result-tier-name'),
@@ -181,6 +189,7 @@ function checkBattleQueryParameters() {
       const spanEl = dom.btnSubmitScan.querySelector('span');
       if (spanEl) spanEl.textContent = "배틀 측정 시작하기 🥊";
     }
+    dom.btnTrySample.classList.add('hidden');
   }
 }
 
@@ -206,6 +215,7 @@ function bindEvents() {
 
   // 3. 파일 인풋 변경 처리
   dom.imageFileInput.addEventListener('change', handleCustomFileUpload);
+  dom.btnTrySample.addEventListener('click', trySampleExperience);
 
   // 4. 패션력 측정하기 실행
   dom.btnSubmitScan.addEventListener('click', startScanningSequence);
@@ -264,7 +274,7 @@ function bindEvents() {
   }
   if (dom.btnConfirmMusinsaRedirect) {
     dom.btnConfirmMusinsaRedirect.addEventListener('click', () => {
-      window.open(state.targetMusinsaUrl, '_blank');
+      window.open(state.targetMusinsaUrl, '_blank', 'noopener,noreferrer');
       dom.musinsaRedirectModal.classList.add('hidden');
     });
   }
@@ -310,14 +320,46 @@ async function handleCustomFileUpload(e) {
     return;
   }
 
+  try {
+    const optimizedImage = await optimizeImageBlob(file);
+    setUploadedImage(optimizedImage);
+    showToast("OOTD 사진이 등록되었습니다! 📸");
+    playSound('select');
+  } catch (error) {
+    console.warn('Image upload validation failed.', error);
+    rejectImageUpload('사진을 읽을 수 없어요. 손상되지 않은 다른 사진을 선택해 주세요. 🧩');
+  }
+}
+
+async function trySampleExperience() {
+  dom.btnTrySample.disabled = true;
+  const originalLabel = dom.btnTrySample.textContent;
+  dom.btnTrySample.textContent = '샘플 코디 불러오는 중... ⏳';
+  try {
+    const response = await fetch('/assets/full-body-example.png');
+    if (!response.ok) throw new Error('Sample image could not be loaded.');
+    const optimizedImage = await optimizeImageBlob(await response.blob());
+    selectTpo('일상');
+    setUploadedImage(optimizedImage);
+    showToast('샘플 장착 완료! 10초 패션 심판 들어갑니다. ⚡');
+    startScanningSequence();
+  } catch (error) {
+    console.warn('Sample experience failed.', error);
+    showToast('샘플을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+    dom.btnTrySample.disabled = false;
+    dom.btnTrySample.textContent = originalLabel;
+  }
+}
+
+async function optimizeImageBlob(blob) {
   let objectUrl;
   try {
-    objectUrl = URL.createObjectURL(file);
+    objectUrl = URL.createObjectURL(blob);
     const image = new Image();
     image.src = objectUrl;
     await image.decode();
-
     if (!image.naturalWidth || !image.naturalHeight) throw new Error('Invalid image dimensions.');
+
     const scale = Math.min(1, MAX_ANALYSIS_IMAGE_DIMENSION / Math.max(image.naturalWidth, image.naturalHeight));
     const canvas = document.createElement('canvas');
     canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
@@ -327,27 +369,20 @@ async function handleCustomFileUpload(e) {
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = 'high';
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    const optimizedImage = canvas.toDataURL('image/jpeg', 0.88);
-
-    state.currentOotdImage = optimizedImage;
-    state.originalOotdImage = optimizedImage;
-    state.improvedOotdImage = null;
-
-    // 미리보기 렌더링
-    dom.uploadPreviewImg.src = state.currentOotdImage;
-    dom.uploadPlaceholder.classList.add('hidden');
-    dom.uploadPreviewContainer.classList.remove('hidden');
-
-    // 측정 버튼 활성화
-    dom.btnSubmitScan.disabled = false;
-    showToast("OOTD 사진이 등록되었습니다! 📸");
-    playSound('select');
-  } catch (error) {
-    console.warn('Image upload validation failed.', error);
-    rejectImageUpload('사진을 읽을 수 없어요. 손상되지 않은 다른 사진을 선택해 주세요. 🧩');
+    return canvas.toDataURL('image/jpeg', 0.88);
   } finally {
     if (objectUrl) URL.revokeObjectURL(objectUrl);
   }
+}
+
+function setUploadedImage(imageDataUrl) {
+  state.currentOotdImage = imageDataUrl;
+  state.originalOotdImage = imageDataUrl;
+  state.improvedOotdImage = null;
+  dom.uploadPreviewImg.src = imageDataUrl;
+  dom.uploadPlaceholder.classList.add('hidden');
+  dom.uploadPreviewContainer.classList.remove('hidden');
+  dom.btnSubmitScan.disabled = false;
 }
 
 function rejectImageUpload(message) {
@@ -513,6 +548,8 @@ function startScanningSequence() {
 // 3단계: 결과창 연산
 function calculateFashionResults() {
   state.isPatched = false;
+  state.improvementChanges = [];
+  dom.improvementChangeSummary.classList.add('hidden');
   if (!state.apiData) throw new Error('Validated AI analysis data is required.');
 
   state.score = state.apiData.score;
@@ -528,6 +565,7 @@ function calculateFashionResults() {
     name,
     val,
     originalVal: val,
+    higherIsBetter: getStatMetadata(name).higherIsBetter,
   }));
 
   // 비주얼 이미지 및 배틀 레이아웃 세팅
@@ -543,6 +581,7 @@ function calculateFashionResults() {
     dom.feedbackTooltip.classList.add('hidden');
     if (dom.resultTopOverlayBadge) dom.resultTopOverlayBadge.classList.add('hidden');
     if (dom.pinInteractionGuide) dom.pinInteractionGuide.classList.add('hidden');
+    dom.devilSummaryCard.classList.add('hidden');
 
     // 상대방 스펙 바인딩
     dom.vsOppScore.textContent = `${state.opponentScore.toLocaleString()}점`;
@@ -592,16 +631,19 @@ function setupPins() {
   document.querySelectorAll('.dynamic-fit-pin').forEach((pin) => pin.remove());
   renderMatchPins('angel', state.bestMatches, dom.pinAngel, '😇', 'bg-white');
   renderMatchPins('devil', state.worstMatches, dom.pinDevil, '😈', 'bg-error-container');
+  renderDevilSummary();
 }
 
 function renderMatchPins(type, matches, basePin, emoji, backgroundClass) {
+  const showNumbers = type === 'devil' && matches.length > 1;
   matches.forEach((match, index) => {
     const pin = index === 0 ? basePin : basePin.cloneNode(true);
-    pin.className = `absolute ${backgroundClass} border-2 border-black rounded-full shadow-[1px_1px_0px_0px_#000] z-20 cursor-pointer text-sm transition-all flex items-center justify-center w-7 h-7 ${index ? 'dynamic-fit-pin' : ''}`;
+    pin.className = `absolute ${backgroundClass} border-2 border-black rounded-full shadow-[1px_1px_0px_0px_#000] z-20 cursor-pointer transition-all flex items-center justify-center ${showNumbers ? 'w-9 h-7 text-[11px]' : 'w-7 h-7 text-sm'} ${index ? 'dynamic-fit-pin' : ''}`;
     pin.style.top = `${match.y}%`;
     pin.style.left = `${match.x}%`;
     pin.dataset.pinType = type;
-    pin.querySelector('span').textContent = emoji;
+    pin.dataset.pinIndex = String(index);
+    pin.querySelector('span').textContent = showNumbers ? `${emoji}${index + 1}` : emoji;
     pin.classList.remove('hidden');
     if (index > 0) {
       pin.removeAttribute('id');
@@ -611,16 +653,57 @@ function renderMatchPins(type, matches, basePin, emoji, backgroundClass) {
   });
 }
 
+function renderDevilSummary() {
+  const matches = state.worstMatches || [];
+  dom.devilSummaryItems.textContent = '';
+  if (!matches.length || state.isBattleMode || state.isPatched) {
+    dom.devilSummaryCard.classList.add('hidden');
+    return;
+  }
+
+  const showNumbers = matches.length > 1;
+  dom.devilSummaryTitle.textContent = showNumbers ? `😈 개선 포인트 ${matches.length}개` : '😈 개선 포인트';
+  dom.pinInteractionText.textContent = showNumbers
+    ? `OOTD 위의 😇 베스트와 😈1~${matches.length} 개선 포인트를 탭해 보세요!`
+    : 'OOTD 위의 😇 베스트와 😈 개선 포인트를 탭해 보세요!';
+
+  matches.forEach((match, index) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'w-full bg-white border-[2px] border-black p-2.5 text-left flex items-center gap-2 hover:translate-x-[1px] hover:translate-y-[1px] transition-transform';
+
+    const marker = document.createElement('span');
+    marker.className = 'shrink-0 font-black text-xs';
+    marker.textContent = showNumbers ? `😈${index + 1}` : '😈';
+
+    const copy = document.createElement('span');
+    copy.className = 'min-w-0 flex-1';
+    const item = document.createElement('strong');
+    item.className = 'block font-headline text-[11px] truncate';
+    item.textContent = match.recommendItem;
+    const reason = document.createElement('small');
+    reason.className = 'block text-[9px] font-bold text-on-surface-variant truncate';
+    reason.textContent = (match.reasonTags || []).map((tag) => `#${tag}`).join(' ');
+    copy.append(item, reason);
+    button.append(marker, copy);
+    button.addEventListener('click', () => showPinTooltip('devil', index));
+    dom.devilSummaryItems.appendChild(button);
+  });
+
+  dom.devilSummaryCard.classList.remove('hidden');
+}
+
 // 핀 상세 정보 툴팁 노출
 function showPinTooltip(type, index = 0) {
   dom.feedbackTooltip.classList.remove('hidden');
   playSound('select');
+  document.querySelectorAll('[data-pin-type]').forEach((pin) => {
+    pin.classList.remove('ring-[5px]', 'ring-black', 'scale-110');
+  });
+  document.querySelector(`[data-pin-type="${type}"][data-pin-index="${index}"]`)
+    ?.classList.add('ring-[5px]', 'ring-black', 'scale-110');
 
   if (type === 'angel') {
-    // 활성 상태 핀 하이라이트 부여
-    dom.pinAngel.classList.add('ring-[5px]', 'ring-black', 'scale-110');
-    dom.pinDevil.classList.remove('ring-[5px]', 'ring-black', 'scale-110');
-
     dom.tooltipTitle.textContent = "😇 BEST MATCH";
     dom.tooltipTitle.className = "font-headline font-black text-xs uppercase px-2 py-0.5 border-[2px] border-black bg-secondary text-black";
     dom.tooltipContent.textContent = state.bestMatches[index].name;
@@ -629,10 +712,6 @@ function showPinTooltip(type, index = 0) {
     dom.linkShopping.classList.add('hidden');
     dom.btnApplyAdvice.classList.add('hidden');
   } else {
-    // 활성 상태 핀 하이라이트 부여
-    dom.pinDevil.classList.add('ring-[5px]', 'ring-black', 'scale-110');
-    dom.pinAngel.classList.remove('ring-[5px]', 'ring-black', 'scale-110');
-
     dom.tooltipTitle.textContent = "😈 WORST MATCH";
     dom.tooltipTitle.className = "font-headline font-black text-xs uppercase px-2 py-0.5 border-[2px] border-black bg-error-container text-black";
     
@@ -665,10 +744,9 @@ function showPinTooltip(type, index = 0) {
 
 function hideTooltip() {
   dom.feedbackTooltip.classList.add('hidden');
-  
-  // 모든 핀 활성 상태 하이라이트 제거
-  dom.pinAngel.classList.remove('ring-[5px]', 'ring-black', 'scale-110');
-  dom.pinDevil.classList.remove('ring-[5px]', 'ring-black', 'scale-110');
+  document.querySelectorAll('[data-pin-type]').forEach((pin) => {
+    pin.classList.remove('ring-[5px]', 'ring-black', 'scale-110');
+  });
 }
 
 
@@ -767,6 +845,7 @@ async function applyStyleAdvice() {
         previousScore,
       });
       applyImprovedAnalysis(analysis, previousStats);
+      renderImprovementChangeSummary(previousScore, recommendItemName);
       await animateInlineScore(previousScore, state.score);
     } catch (analysisError) {
       console.warn('Improved image analysis failed.', analysisError);
@@ -799,6 +878,7 @@ async function applyStyleAdvice() {
   dom.improvedShoppingLink.href = `https://www.musinsa.com/search/goods?keyword=${encodeURIComponent(recommendItemName)}`;
   dom.improvedShoppingCard.classList.remove('hidden');
   dom.pinInteractionGuide.classList.add('hidden');
+  dom.devilSummaryCard.classList.add('hidden');
   showImageVersion('after');
   showToast('코디 적용 완료! BEFORE / AFTER로 변신을 확인해 보세요. ✨');
 }
@@ -825,12 +905,48 @@ function applyImprovedAnalysis(analysis, previousStats) {
     name,
     val,
     originalVal: previousStats.get(name) ?? val,
+    higherIsBetter: getStatMetadata(name).higherIsBetter,
   }));
   state.isPatched = true;
   dom.resultScoreNum.textContent = state.score.toLocaleString();
   dom.resultTierName.textContent = state.tier;
   dom.resultRoastText.textContent = analysis.roast;
   renderVibeStats();
+}
+
+function renderImprovementChangeSummary(previousScore, recommendItemName) {
+  const scoreDelta = state.score - previousScore;
+  const statChanges = state.stats
+    .map((stat) => {
+      const rawDelta = stat.val - stat.originalVal;
+      const higherIsBetter = stat.higherIsBetter ?? getStatMetadata(stat.name).higherIsBetter;
+      return {
+        label: stat.name,
+        rawDelta,
+        improvement: higherIsBetter ? rawDelta : -rawDelta,
+      };
+    })
+    .filter((change) => change.improvement > 0)
+    .sort((left, right) => right.improvement - left.improvement)
+    .slice(0, 2);
+
+  state.improvementChanges = [
+    { label: recommendItemName, value: '적용 완료' },
+    ...(scoreDelta ? [{ label: '패션력', value: `${scoreDelta > 0 ? '+' : ''}${scoreDelta.toLocaleString()}` }] : []),
+    ...statChanges.map((change) => ({
+      label: change.label,
+      value: `${change.rawDelta > 0 ? '+' : ''}${change.rawDelta}`,
+    })),
+  ];
+
+  dom.improvementChangeItems.textContent = '';
+  state.improvementChanges.forEach((change) => {
+    const chip = document.createElement('span');
+    chip.className = 'bg-white border-[2px] border-black px-2 py-1 text-[9px] font-black';
+    chip.textContent = `${change.label} ${change.value}`;
+    dom.improvementChangeItems.appendChild(chip);
+  });
+  dom.improvementChangeSummary.classList.toggle('hidden', state.improvementChanges.length === 0);
 }
 
 async function prepareImageForStyleEdit(dataUrl) {
@@ -920,6 +1036,38 @@ function calculateTier(score) {
   return '아이언';
 }
 
+const STAT_METADATA = Object.freeze({
+  '색상 불협화음 🎨': { higherIsBetter: false },
+  '안구 보호도 👁️': { higherIsBetter: true },
+  '근자감 농도 ⚡': { higherIsBetter: true },
+  '지갑 방어력 💸': { higherIsBetter: true },
+  '마실 적합도 ☕': { higherIsBetter: true },
+  '설렘 유발 지수 💘': { higherIsBetter: true },
+  '과도한 격식도 🕴️': { higherIsBetter: false },
+  '센스 스포일러 🕶️': { higherIsBetter: true },
+  '호감도 파괴력 💔': { higherIsBetter: false },
+  '데이트 생존율 🧬': { higherIsBetter: true },
+  '부장님 눈총 지수 😒': { higherIsBetter: false },
+  '프로페셔널 지수 💼': { higherIsBetter: true },
+  '활동성 방해율 🏃': { higherIsBetter: false },
+  '퇴근 본능 자극도 ⏰': { higherIsBetter: false },
+  '평판 수호 지수 🛡️': { higherIsBetter: true },
+  '헬창 아우라 지수 🏋️': { higherIsBetter: true },
+  '거울 셀카 득표율 📸': { higherIsBetter: true },
+  '땀 배출 지연도 💦': { higherIsBetter: false },
+  '신체 보정 치트 📐': { higherIsBetter: true },
+  '근손실 위장도 🧬': { higherIsBetter: true },
+  '신부 저격 민폐도 🏹': { higherIsBetter: false },
+  '하객 격식 비율 🤝': { higherIsBetter: true },
+  '사진 생존율 📸': { higherIsBetter: true },
+  '피로연 프리패스 🍽️': { higherIsBetter: true },
+  '친척 잔소리 실드 🛡️': { higherIsBetter: true },
+});
+
+function getStatMetadata(name) {
+  return STAT_METADATA[name] || { higherIsBetter: true };
+}
+
 // 스탯별 위트있는 상세 설명 데이터베이스
 const statDescriptions = {
   // 일상
@@ -1005,8 +1153,16 @@ function renderVibeStats() {
     // 5대 교차 컬러 배치 (Lavender, Mint, Peach, Cream, Deep Lavender)
     const colorClasses = ['bg-primary', 'bg-secondary', 'bg-tertiary', 'bg-cream', 'bg-[#c9c1ff]'];
     const barColor = colorClasses[idx % colorClasses.length];
+    const rawDelta = stat.val - stat.originalVal;
+    const higherIsBetter = stat.higherIsBetter ?? getStatMetadata(stat.name).higherIsBetter;
+    const improvement = higherIsBetter ? rawDelta : -rawDelta;
     const baseline = Math.min(stat.originalVal, stat.val);
-    const gain = Math.max(0, stat.val - baseline);
+    const change = Math.abs(rawDelta);
+    const changeLabel = rawDelta
+      ? `${rawDelta > 0 ? '+' : ''}${rawDelta} ${rawDelta > 0 ? 'UP!' : 'DOWN!'}`
+      : '';
+    const changeTextClass = improvement > 0 ? 'text-[#087f5b]' : 'text-error';
+    const changeBarClass = improvement > 0 ? 'bg-secondary' : 'bg-error';
 
     const statItem = document.createElement('div');
     statItem.className = "flex flex-col gap-1 cursor-pointer group w-full";
@@ -1015,9 +1171,9 @@ function renderVibeStats() {
         <span class="stat-name w-24 font-bold text-xs uppercase tracking-tight text-black"></span>
         <div class="flex-1 h-5 border-[3px] border-black bg-white flex overflow-hidden">
           <div class="stat-bar-base ${barColor} h-full transition-all duration-700" style="width: 0%;"></div>
-          <div class="stat-bar-gain bg-error h-full transition-all duration-700" style="width: 0%;"></div>
+          <div class="stat-bar-gain ${changeBarClass} h-full transition-all duration-700" style="width: 0%;"></div>
         </div>
-        <span class="w-14 text-right text-xs font-headline font-black text-black">${stat.val}%${gain ? `<small class="block text-[8px] text-error">+${gain} UP!</small>` : ''}</span>
+        <span class="w-14 text-right text-xs font-headline font-black text-black">${stat.val}%${change ? `<small class="block text-[8px] ${changeTextClass}">${changeLabel}</small>` : ''}</span>
       </div>
       <div class="stat-desc-container hidden w-full"></div>
     `;
@@ -1052,7 +1208,7 @@ function renderVibeStats() {
       const baseEl = statItem.querySelector('.stat-bar-base');
       const gainEl = statItem.querySelector('.stat-bar-gain');
       if (baseEl) baseEl.style.width = `${baseline}%`;
-      if (gainEl) gainEl.style.width = `${gain}%`;
+      if (gainEl) gainEl.style.width = `${change}%`;
     }, 50);
   });
 }
@@ -1118,11 +1274,17 @@ function resetToUploadScreen() {
   state.score = 0;
   state.isPatched = false;
   state.apiData = null; // API 데이터 리셋
+  state.improvementChanges = [];
   dom.imageVersionToggle.classList.add('hidden');
   dom.improvedShoppingCard.classList.add('hidden');
+  dom.improvementChangeSummary.classList.add('hidden');
+  dom.devilSummaryCard.classList.add('hidden');
   dom.styleEditOverlay.classList.add('hidden');
   dom.styleEditOverlay.classList.remove('flex');
   dom.analysisErrorPanel.classList.add('hidden');
+  dom.btnTrySample.disabled = false;
+  dom.btnTrySample.textContent = '샘플로 10초 체험 ⚡';
+  dom.btnTrySample.classList.remove('hidden');
   
   // 핀 복원 및 클릭 리스너 청소
   dom.pinDevil.classList.remove('hidden');
