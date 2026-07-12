@@ -43,7 +43,19 @@ export const OUTFIT_RESULT_SCHEMA = Object.freeze({
   required: ['score', 'tier', 'roast', 'bestMatches', 'worstMatches', 'musinsaQuery', 'stats'],
 });
 
-export function parseOutfitResult(response) {
+const STAT_KEYS_BY_TPO = Object.freeze({
+  '일상': ['색상 불협화음 🎨', '안구 보호도 👁️', '근자감 농도 ⚡', '지갑 방어력 💸', '마실 적합도 ☕'],
+  '데이트': ['설렘 유발 지수 💘', '과도한 격식도 🕴️', '센스 스포일러 🕶️', '호감도 파괴력 💔', '데이트 생존율 🧬'],
+  '출근': ['부장님 눈총 지수 😒', '프로페셔널 지수 💼', '활동성 방해율 🏃', '퇴근 본능 자극도 ⏰', '평판 수호 지수 🛡️'],
+  '운동': ['헬창 아우라 지수 🏋️', '거울 셀카 득표율 📸', '땀 배출 지연도 💦', '신체 보정 치트 📐', '근손실 위장도 🧬'],
+  '하객': ['신부 저격 민폐도 🏹', '하객 격식 비율 🤝', '사진 생존율 📸', '피로연 프리패스 🍽️', '친척 잔소리 실드 🛡️'],
+});
+
+export function getStatKeysForTpo(tpo) {
+  return STAT_KEYS_BY_TPO[tpo] || [];
+}
+
+export function parseOutfitResult(response, tpo) {
   const candidate = response?.candidates?.[0];
   const blocked = candidate?.finishReason === 'SAFETY'
     || response?.promptFeedback?.blockReason === 'SAFETY';
@@ -65,12 +77,12 @@ export function parseOutfitResult(response) {
     throw invalidResponse('Gemini returned invalid JSON.');
   }
 
-  const normalized = normalizeOutfitResult(result);
+  const normalized = normalizeOutfitResult(result, tpo);
   validateOutfitResult(normalized);
   return normalized;
 }
 
-function normalizeOutfitResult(result) {
+function normalizeOutfitResult(result, tpo) {
   if (!result || typeof result !== 'object') return result;
 
   const normalizeMatch = (match, withRecommendation = false) => {
@@ -96,9 +108,14 @@ function normalizeOutfitResult(result) {
   const worstSource = Array.isArray(result.worstMatches)
     ? result.worstMatches
     : result.worstMatch ? [result.worstMatch] : [];
-  const stats = Object.fromEntries(Object.entries(result.stats || {}).slice(0, 5).map(([name, value]) => [
-    cleanText(name),
-    boundedInteger(value, 0, 100),
+  const allowedStatKeys = getStatKeysForTpo(tpo);
+  const providedStats = new Map(Object.entries(result.stats || {}).map(([name, value]) => [
+    comparableStatKey(name),
+    value,
+  ]));
+  const stats = Object.fromEntries(allowedStatKeys.map((name) => [
+    name,
+    boundedInteger(providedStats.get(comparableStatKey(name)), 0, 100),
   ]));
 
   const worstMatches = worstSource.map((match) => normalizeMatch(match, true)).filter(Boolean).slice(0, 4);
@@ -153,6 +170,10 @@ function invalidResponse(message) {
 
 function cleanText(value) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function comparableStatKey(value) {
+  return cleanText(value).normalize('NFKC').replaceAll('\uFE0F', '');
 }
 
 function boundedInteger(value, min, max) {

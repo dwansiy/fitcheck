@@ -32,6 +32,10 @@ const state = {
   apiData: null,
 };
 
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const MAX_ANALYSIS_IMAGE_DIMENSION = 1600;
+const ALLOWED_UPLOAD_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
 // 2. DOM 요소 셀렉터
 const dom = {
   appToast: document.getElementById('app-toast'),
@@ -182,6 +186,7 @@ function checkBattleQueryParameters() {
 
 // 이벤트 바인딩
 function bindEvents() {
+  dom.appHeader.querySelector('h1')?.addEventListener('click', () => window.location.reload());
   dom.btnCloseFirstVisitGuide.addEventListener('click', () => {
     localStorage.setItem('fitcheck.fullBodyGuideSeen', '1');
     dom.firstVisitGuide.classList.add('hidden');
@@ -292,14 +297,40 @@ function selectTpo(tpo) {
 }
 
 // 커스텀 이미지 파일 업로드 처리
-function handleCustomFileUpload(e) {
+async function handleCustomFileUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
 
-  const reader = new FileReader();
-  reader.onload = function(event) {
-    state.currentOotdImage = event.target.result;
-    state.originalOotdImage = event.target.result;
+  if (!ALLOWED_UPLOAD_TYPES.has(file.type)) {
+    rejectImageUpload('JPG, PNG, WEBP 형식의 사진만 업로드할 수 있어요. 🖼️');
+    return;
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    rejectImageUpload('사진 용량이 너무 커요. 10MB 이하의 사진을 선택해 주세요. 📦');
+    return;
+  }
+
+  let objectUrl;
+  try {
+    objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.src = objectUrl;
+    await image.decode();
+
+    if (!image.naturalWidth || !image.naturalHeight) throw new Error('Invalid image dimensions.');
+    const scale = Math.min(1, MAX_ANALYSIS_IMAGE_DIMENSION / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Canvas is unavailable.');
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const optimizedImage = canvas.toDataURL('image/jpeg', 0.88);
+
+    state.currentOotdImage = optimizedImage;
+    state.originalOotdImage = optimizedImage;
     state.improvedOotdImage = null;
 
     // 미리보기 렌더링
@@ -311,8 +342,18 @@ function handleCustomFileUpload(e) {
     dom.btnSubmitScan.disabled = false;
     showToast("OOTD 사진이 등록되었습니다! 📸");
     playSound('select');
-  };
-  reader.readAsDataURL(file);
+  } catch (error) {
+    console.warn('Image upload validation failed.', error);
+    rejectImageUpload('사진을 읽을 수 없어요. 손상되지 않은 다른 사진을 선택해 주세요. 🧩');
+  } finally {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+  }
+}
+
+function rejectImageUpload(message) {
+  dom.imageFileInput.value = '';
+  if (!state.currentOotdImage) dom.btnSubmitScan.disabled = true;
+  showToast(message);
 }
 
 // API 호출 및 다중 폴백 로직
@@ -971,7 +1012,7 @@ function renderVibeStats() {
     statItem.className = "flex flex-col gap-1 cursor-pointer group w-full";
     statItem.innerHTML = `
       <div class="flex items-center gap-2 w-full hover:translate-x-[2px] transition-transform">
-        <span class="w-24 font-bold text-xs uppercase tracking-tight text-black">${stat.name}</span>
+        <span class="stat-name w-24 font-bold text-xs uppercase tracking-tight text-black"></span>
         <div class="flex-1 h-5 border-[3px] border-black bg-white flex overflow-hidden">
           <div class="stat-bar-base ${barColor} h-full transition-all duration-700" style="width: 0%;"></div>
           <div class="stat-bar-gain bg-error h-full transition-all duration-700" style="width: 0%;"></div>
@@ -980,6 +1021,7 @@ function renderVibeStats() {
       </div>
       <div class="stat-desc-container hidden w-full"></div>
     `;
+    statItem.querySelector('.stat-name').textContent = stat.name;
 
     // 탭하여 스탯별 설명 팝업/토글 바인딩
     statItem.addEventListener('click', () => {
@@ -1629,11 +1671,11 @@ function openInstagramApp() {
     window.location.href = "instagram://";
     // 1.2초 후 백그라운드 웹 연동(인스타그램 미설치 시)
     setTimeout(() => {
-      window.open("https://www.instagram.com/", "_blank");
+      window.open("https://www.instagram.com/", "_blank", "noopener,noreferrer");
     }, 1200);
   } else {
     // 데스크탑 브라우저는 바로 인스타그램 웹 연동
-    window.open("https://www.instagram.com/", "_blank");
+    window.open("https://www.instagram.com/", "_blank", "noopener,noreferrer");
   }
 }
 

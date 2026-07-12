@@ -31,7 +31,7 @@
 
   <!-- 통합 헤더 (모든 화면 크기에서 일관되게 힙한 로고 표시) -->
   <header id="app-header" class="w-full flex items-center justify-center pt-8 pb-4">
-    <h1 class="font-headline text-4xl md:text-5xl font-black text-black uppercase tracking-tighter drop-shadow-[4px_4px_0px_rgba(0,0,0,1)] bg-white border-[3px] border-black px-6 py-2 rotate-[-2deg] cursor-pointer hover:rotate-[0deg] transition-all" onclick="location.reload()">
+    <h1 class="font-headline text-4xl md:text-5xl font-black text-black uppercase tracking-tighter drop-shadow-[4px_4px_0px_rgba(0,0,0,1)] bg-white border-[3px] border-black px-6 py-2 rotate-[-2deg] cursor-pointer hover:rotate-[0deg] transition-all">
       FITCHECK!
     </h1>
   </header>
@@ -96,7 +96,7 @@
         </div>
       </div>
       <!-- 파일 인풋 요소는 업로드 영역 밖으로 이동하여 무한클릭 루프 및 다이얼로그 차단 현상 방지 -->
-      <input type="file" id="image-file-input" accept="image/*" class="hidden">
+      <input type="file" id="image-file-input" accept="image/jpeg,image/png,image/webp" class="hidden">
 
       <!-- TPO 상황선택 칩 -->
       <div class="w-full flex flex-col gap-3">
@@ -267,7 +267,7 @@
           </div>
           <p id="tooltip-content" class="text-xs font-bold mb-3 leading-relaxed text-black">추천 코멘트 내용</p>
           <div class="flex gap-2">
-            <a id="link-shopping" href="" target="_blank" class="flex-1 bg-white border-[2px] border-black p-3 font-bold text-center text-xs neo-shadow hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all flex items-center justify-center gap-1 text-black">
+            <a id="link-shopping" href="" target="_blank" rel="noopener noreferrer" class="flex-1 bg-white border-[2px] border-black p-3 font-bold text-center text-xs neo-shadow hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all flex items-center justify-center gap-1 text-black">
               실제 상품 보기 <span class="material-symbols-outlined text-xs">open_in_new</span>
             </a>
             <button id="btn-apply-advice" class="flex-1 bg-secondary border-[2px] border-black p-3 font-headline font-black text-xs uppercase neo-shadow hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all text-black">
@@ -351,7 +351,7 @@
 
       <!-- 풋터 크레딧 -->
       <div class="flex flex-col items-center gap-2 mt-8 pb-8">
-        <a href="https://www.instagram.com/team.letsgo_fit/" target="_blank" class="text-[10px] font-bold opacity-50 hover:opacity-100 transition-opacity uppercase tracking-widest text-black flex items-center gap-0.5">
+        <a href="https://www.instagram.com/team.letsgo_fit/" target="_blank" rel="noopener noreferrer" class="text-[10px] font-bold opacity-50 hover:opacity-100 transition-opacity uppercase tracking-widest text-black flex items-center gap-0.5">
           Team Letsgo | @team.letsgo_fit <span class="material-symbols-outlined text-[10px]">open_in_new</span>
         </a>
       </div>
