@@ -357,6 +357,8 @@ function aiErrorMessage(error, fallbackSuffix = '') {
 function startScanningSequence() {
   dom.btnSubmitScan.disabled = true;
   dom.analysisErrorPanel.classList.add('hidden');
+  dom.loadingProgressFill.classList.remove('bg-error', 'border-error');
+  dom.loadingProgressFill.classList.add('bg-secondary', 'border-black');
   dom.loadingTitle.textContent = 'OOTD 스캐닝 중...';
   
   // 화면 전환 (Upload -> Loading)
@@ -430,7 +432,9 @@ function startScanningSequence() {
         if (apiFailed) {
           dom.loadingTitle.textContent = '분석을 완료하지 못했어요';
           dom.loadingStatusText.textContent = aiErrorMessage(apiError);
-          dom.loadingProgressFill.style.width = '20%';
+          dom.loadingProgressFill.style.width = '100%';
+          dom.loadingProgressFill.classList.remove('bg-secondary', 'border-black');
+          dom.loadingProgressFill.classList.add('bg-error', 'border-error');
           dom.analysisErrorMessage.textContent = aiErrorMessage(apiError);
           dom.analysisErrorPanel.classList.remove('hidden');
           dom.btnSubmitScan.disabled = false;
@@ -798,6 +802,8 @@ async function reanalyzeImprovedImage() {
   dom.screenResult.classList.remove('active-screen');
   dom.screenLoading.classList.add('active-screen');
   dom.analysisErrorPanel.classList.add('hidden');
+  dom.loadingProgressFill.classList.remove('bg-error', 'border-error');
+  dom.loadingProgressFill.classList.add('bg-secondary', 'border-black');
   dom.loadingTitle.textContent = '개선 이미지 재분석 중...';
   dom.loadingStatusText.textContent = '새 코디를 처음부터 다시 채점하고 있어요. 🔍';
   dom.loadingProgressFill.style.width = '35%';
@@ -816,6 +822,9 @@ async function reanalyzeImprovedImage() {
     dom.loadingTitle.textContent = '재분석을 완료하지 못했어요';
     dom.loadingStatusText.textContent = aiErrorMessage(error);
     dom.analysisErrorMessage.textContent = aiErrorMessage(error);
+    dom.loadingProgressFill.style.width = '100%';
+    dom.loadingProgressFill.classList.remove('bg-secondary', 'border-black');
+    dom.loadingProgressFill.classList.add('bg-error', 'border-error');
     dom.analysisErrorPanel.classList.remove('hidden');
   } finally {
     dom.btnReanalyzeImproved.disabled = false;
