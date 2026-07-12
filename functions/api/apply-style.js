@@ -46,10 +46,13 @@ function cleanText(value, maxLength) {
 
 function buildEditPrompt(recommendation, feedback) {
   return [
-    'Edit input image 0 as a professional fashion photo retouch.',
-    `Replace only the criticized clothing item with: ${recommendation}.`,
+    'Perform a strictly localized fashion garment replacement on input image 0.',
+    `Replace only the criticized clothing item with: ${recommendation}. Change pixels only where that garment exists.`,
     feedback ? `Styling context: ${feedback}.` : '',
-    'Preserve the same person, identity, face, hair, skin, body shape, pose, hands, camera angle, lighting, background, and every other garment.',
+    'ABSOLUTE IDENTITY LOCK: preserve the exact same person and identity. Never modify, regenerate, beautify, retouch, or reinterpret the face, facial features, expression, eyes, nose, mouth, ears, hair, skin, skin tone, neck, hands, fingers, body, body proportions, body shape, height, weight, pose, or anatomy.',
+    'Preserve the exact original silhouette and physical boundaries of the person. The replacement garment must conform to the existing body and pose; the body must never conform to the new garment.',
+    'Preserve camera angle, crop, perspective, lighting, shadows, background, surrounding objects, accessories, and every garment not explicitly requested.',
+    'If the requested garment cannot be replaced without changing the face or body, leave the protected person pixels unchanged and make only the safest minimal garment edit.',
     'Keep the result photorealistic. Do not add text, logos, borders, stickers, extra people, or accessories not requested.',
   ].filter(Boolean).join(' ');
 }

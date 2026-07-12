@@ -25,15 +25,12 @@ npx wrangler pages dev dist --ai AI
 - Build output directory: `dist`
 - Root directory: 저장소 루트
 - Secret: `GEMINI_API_KEY`
-- Optional product search secrets: `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`
 - Workers AI binding: `AI`
 - Optional variable: `AI_OUTFIT_ANALYSIS_MODEL=gemini-3.1-flash-lite`
 - Optional variable: `AI_STYLE_EDIT_MODEL=@cf/black-forest-labs/flux-2-klein-4b`
 - Pages Functions: 저장소 루트의 `functions/`
 
 API 키를 코드 또는 `VITE_` 환경 변수에 넣지 마세요. 배포 환경에서는 암호화된 `GEMINI_API_KEY` Secret만 사용합니다.
-
-네이버 쇼핑 검색 Secret을 설정하면 추천 카드에 실제 판매 상품 이미지, 가격, 판매처와 상품 링크가 표시됩니다. 설정하지 않았거나 검색이 실패하면 업로드 사진의 해당 부위 이미지를 사용하고 무신사 키워드 검색 링크로 연결합니다. 네이버 개발자 센터에서 애플리케이션을 등록할 때 `검색` API 사용 권한을 활성화해야 합니다.
 
 ## AI 모델 확장
 

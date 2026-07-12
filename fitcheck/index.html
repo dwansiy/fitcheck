@@ -14,6 +14,16 @@
 </head>
 <body class="font-body text-black min-h-screen flex flex-col pb-8 bg-[#eae6ff]">
 
+  <div id="first-visit-guide" class="fixed inset-0 z-[100] bg-black/70 p-5 flex items-center justify-center hidden">
+    <div class="w-full max-w-sm bg-white border-[3px] border-black neo-shadow p-5 text-center">
+      <span class="inline-block bg-secondary border-[2px] border-black px-3 py-1 text-[10px] font-black rotate-[-2deg]">PHOTO GUIDE</span>
+      <h2 class="font-headline text-2xl font-black mt-3">전신이 다 보이면<br>분석이 더 정확해요!</h2>
+      <img src="/assets/full-body-example.png" alt="머리부터 신발까지 중앙에 보이는 전신샷 예시" class="w-full max-h-[55vh] object-contain my-3 border-[3px] border-black bg-primary">
+      <p class="text-xs font-bold mb-4">머리부터 신발까지 잘리지 않게, 몸 전체를 화면 중앙에 맞춰 주세요.</p>
+      <button id="btn-close-first-visit-guide" class="w-full bg-tertiary border-[3px] border-black py-3 font-headline font-black neo-shadow">확인했어요 📸</button>
+    </div>
+  </div>
+
   <!-- 글로벌 토스트 알림 -->
   <div id="app-toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-white border-[3px] border-black px-6 py-3 neo-shadow font-bold hidden transition-all duration-300">
     <span id="toast-text">알림 메세지</span>
@@ -209,6 +219,14 @@
             <button id="btn-show-after" class="px-2 py-1 text-[10px] font-black bg-secondary">AFTER</button>
           </div>
 
+          <div id="style-edit-overlay" class="absolute inset-0 z-40 hidden bg-white/60 backdrop-blur-[3px] flex-col items-center justify-center text-center p-6">
+            <div class="w-16 h-16 rounded-full border-[4px] border-black border-dashed animate-spin"></div>
+            <div class="mt-4 bg-secondary border-[3px] border-black px-4 py-3 shadow-[3px_3px_0_#000]">
+              <p class="font-headline text-sm font-black">의상만 리믹스 중...</p>
+              <p id="style-edit-status" class="text-[10px] font-bold mt-1">얼굴·신체·배경은 그대로 고정하고 있어요.</p>
+            </div>
+          </div>
+
           <!-- Angel Marker (😇) -->
           <div id="pin-angel" class="absolute bg-white border-2 border-black rounded-full shadow-[1px_1px_0px_0px_#000] z-20 cursor-pointer text-sm transition-all flex items-center justify-center w-7 h-7">
             <span>😇</span>
@@ -223,7 +241,7 @@
 
         <!-- 이미지 바로 아래에 배치하는 친절한 인터랙션 가이드 팁 -->
         <div id="pin-interaction-guide" class="w-full text-center py-2.5 bg-white border-b-[3px] border-black text-[10px] font-black text-on-surface-variant flex items-center justify-center gap-1 select-none">
-          <span class="animate-bounce text-xs">💡</span> OOTD 위의 여러 😇 베스트 / 😈 개선 포인트를 탭해 보세요!
+          <span class="animate-bounce text-xs">💡</span> OOTD 위의 😇 베스트 1개 / 😈 개선 포인트를 탭해 보세요!
         </div>
 
         <!-- 핀 클릭 피드백 툴팁 박스 (이미지를 가리지 않도록 이미지 박스 아래에 배치) -->
@@ -233,7 +251,6 @@
             <button id="btn-close-tooltip" class="text-xl font-bold leading-none hover:text-error">&times;</button>
           </div>
           <p id="tooltip-content" class="text-xs font-bold mb-3 leading-relaxed text-black">추천 코멘트 내용</p>
-          <div id="recommendation-list" class="hidden flex-col gap-3 mb-4"></div>
           <div class="flex gap-2">
             <a id="link-shopping" href="" target="_blank" class="flex-1 bg-white border-[2px] border-black p-3 font-bold text-center text-xs neo-shadow hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all flex items-center justify-center gap-1 text-black">
               실제 상품 보기 <span class="material-symbols-outlined text-xs">open_in_new</span>
@@ -290,6 +307,17 @@
           <button id="btn-reanalyze-improved" class="w-full bg-secondary border-[3px] border-black py-4 hover:translate-x-px hover:translate-y-px font-headline text-sm font-black uppercase">
             개선 이미지 다시 분석하기 🔍
           </button>
+        </div>
+
+        <div id="improved-shopping-card" class="hidden w-full bg-secondary border-b-[3px] border-black p-4">
+          <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-[9px] font-black uppercase">방금 적용한 아이템</p>
+              <p id="improved-shopping-item" class="font-headline text-sm font-black truncate">추천 아이템</p>
+              <p id="improved-shopping-description" class="text-[10px] font-bold mt-1"></p>
+            </div>
+            <a id="improved-shopping-link" href="#" target="_blank" rel="noopener noreferrer" class="shrink-0 bg-white border-[2px] border-black px-3 py-2 text-xs font-black neo-shadow">무신사 검색 ↗</a>
+          </div>
         </div>
         
         <!-- 공유 & 배틀 그룹 카드 (Pastel Cream) -->

@@ -31,8 +31,8 @@ export const OUTFIT_RESULT_SCHEMA = Object.freeze({
     score: { type: 'integer', minimum: 0, maximum: 10000 },
     tier: { type: 'string' },
     roast: { type: 'string' },
-    bestMatches: { type: 'array', items: MATCH_SCHEMA, minItems: 1, maxItems: 4 },
-    worstMatches: { type: 'array', items: WORST_MATCH_SCHEMA, minItems: 1, maxItems: 4 },
+    bestMatches: { type: 'array', items: MATCH_SCHEMA, minItems: 1, maxItems: 1 },
+    worstMatches: { type: 'array', items: WORST_MATCH_SCHEMA, minItems: 1, maxItems: 3 },
     musinsaQuery: { type: 'string' },
     stats: {
       type: 'object',
@@ -105,8 +105,8 @@ function normalizeOutfitResult(result) {
     score: boundedInteger(result.score, 0, 10000),
     tier: cleanText(result.tier),
     roast: cleanText(result.roast),
-    bestMatches: bestSource.map((match) => normalizeMatch(match)).filter(Boolean).slice(0, 4),
-    worstMatches,
+    bestMatches: bestSource.map((match) => normalizeMatch(match)).filter(Boolean).slice(0, 1),
+    worstMatches: worstMatches.slice(0, 3),
     musinsaQuery: cleanText(result.musinsaQuery) || worstMatches[0]?.recommendItem || '',
     stats,
   };
@@ -128,11 +128,11 @@ function validateOutfitResult(result) {
     && isNonEmptyText(result.roast)
     && Array.isArray(result.bestMatches)
     && result.bestMatches.length >= 1
-    && result.bestMatches.length <= 4
+    && result.bestMatches.length === 1
     && result.bestMatches.every((match) => isMatch(match))
     && Array.isArray(result.worstMatches)
     && result.worstMatches.length >= 1
-    && result.worstMatches.length <= 4
+    && result.worstMatches.length <= 3
     && result.worstMatches.every((match) => isMatch(match, true)
       && Array.isArray(match.reasonTags)
       && match.reasonTags.length >= 1

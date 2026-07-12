@@ -30,7 +30,6 @@ const state = {
 
   // AI API 결과 임시 보관
   apiData: null,
-  productRecommendations: [],
 };
 
 // 2. DOM 요소 셀렉터
@@ -38,6 +37,8 @@ const dom = {
   appToast: document.getElementById('app-toast'),
   toastText: document.getElementById('toast-text'),
   appHeader: document.getElementById('app-header'),
+  firstVisitGuide: document.getElementById('first-visit-guide'),
+  btnCloseFirstVisitGuide: document.getElementById('btn-close-first-visit-guide'),
   
   // 화면 세션들
   screenUpload: document.getElementById('screen-upload'),
@@ -69,7 +70,6 @@ const dom = {
   feedbackTooltip: document.getElementById('feedback-tooltip'),
   tooltipTitle: document.getElementById('tooltip-title'),
   tooltipContent: document.getElementById('tooltip-content'),
-  recommendationList: document.getElementById('recommendation-list'),
   btnCloseTooltip: document.getElementById('btn-close-tooltip'),
   linkShopping: document.getElementById('link-shopping'),
   btnApplyAdvice: document.getElementById('btn-apply-advice'),
@@ -78,6 +78,12 @@ const dom = {
   btnShowAfter: document.getElementById('btn-show-after'),
   btnReanalyzeImproved: document.getElementById('btn-reanalyze-improved'),
   reanalyzeImprovedPanel: document.getElementById('reanalyze-improved-panel'),
+  styleEditOverlay: document.getElementById('style-edit-overlay'),
+  styleEditStatus: document.getElementById('style-edit-status'),
+  improvedShoppingCard: document.getElementById('improved-shopping-card'),
+  improvedShoppingItem: document.getElementById('improved-shopping-item'),
+  improvedShoppingDescription: document.getElementById('improved-shopping-description'),
+  improvedShoppingLink: document.getElementById('improved-shopping-link'),
   
   resultScoreNum: document.getElementById('result-score-num'),
   resultTierName: document.getElementById('result-tier-name'),
@@ -124,6 +130,9 @@ const dom = {
 
 function init() {
   bindEvents();
+  if (localStorage.getItem('fitcheck.fullBodyGuideSeen') !== '1') {
+    dom.firstVisitGuide.classList.remove('hidden');
+  }
   
   // 배틀 모드 쿼리 파라미터 감지 및 처리
   checkBattleQueryParameters();
@@ -172,6 +181,10 @@ function checkBattleQueryParameters() {
 
 // 이벤트 바인딩
 function bindEvents() {
+  dom.btnCloseFirstVisitGuide.addEventListener('click', () => {
+    localStorage.setItem('fitcheck.fullBodyGuideSeen', '1');
+    dom.firstVisitGuide.classList.add('hidden');
+  });
   // 1. TPO 칩 클릭
   dom.tpoChips.forEach(chip => {
     chip.addEventListener('click', (e) => {
@@ -481,8 +494,6 @@ function calculateFashionResults() {
     val,
     originalVal: val,
   }));
-  state.productRecommendations = [];
-  loadProductRecommendations();
 
   // 비주얼 이미지 및 배틀 레이아웃 세팅
   if (state.isBattleMode) {
@@ -578,7 +589,6 @@ function showPinTooltip(type, index = 0) {
     dom.tooltipTitle.textContent = "😇 BEST MATCH";
     dom.tooltipTitle.className = "font-headline font-black text-xs uppercase px-2 py-0.5 border-[2px] border-black bg-secondary text-black";
     dom.tooltipContent.textContent = state.bestMatches[index].name;
-    dom.recommendationList.classList.add('hidden');
     
     // Angel은 쇼핑몰 추천 및 코디적용 숨김
     dom.linkShopping.classList.add('hidden');
@@ -596,13 +606,13 @@ function showPinTooltip(type, index = 0) {
     let query = encodeURIComponent(selectedMatch.recommendItem);
 
     dom.tooltipContent.textContent = comment;
+    state.worstMatch = selectedMatch;
     state.targetMusinsaItem = selectedMatch.recommendItem;
     state.targetMusinsaUrl = `https://www.musinsa.com/search/goods?keyword=${query}`;
     dom.linkShopping.href = "#";
-    renderRecommendationCards();
     
-    // Devil 쇼핑몰 이동 및 추천 코디 버튼 활성화
-    dom.linkShopping.classList.remove('hidden');
+    // 개선 전에는 적용 버튼만 노출하고 쇼핑 링크는 개선 완료 후 별도 카드에서 제공한다.
+    dom.linkShopping.classList.add('hidden');
     if (state.isPatched) {
       dom.btnApplyAdvice.classList.add('hidden'); // 이미 적용되었으면 감춤
     } else {
@@ -626,108 +636,28 @@ function hideTooltip() {
   dom.pinDevil.classList.remove('ring-[5px]', 'ring-black', 'scale-110');
 }
 
-function renderRecommendationCards() {
-  dom.recommendationList.innerHTML = '';
-  dom.recommendationList.classList.remove('hidden');
-  dom.recommendationList.classList.add('flex');
 
-  state.worstMatches.slice(0, 3).forEach((match, index) => {
-    const product = state.productRecommendations[index];
-    const card = document.createElement('button');
-    card.type = 'button';
-    card.className = `w-full flex items-stretch gap-3 border-[2px] border-black p-2 text-left ${index === 0 ? 'bg-secondary shadow-[2px_2px_0_#000]' : 'bg-white'}`;
-    const tags = match.reasonTags.map((tag) => `<span class="text-[9px] font-black bg-cream border border-black px-1.5 py-0.5">#${escapeHtml(tag)}</span>`).join('');
-    const visual = product?.image
-      ? `<img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.title)}" class="w-16 h-16 shrink-0 border-[2px] border-black bg-white object-contain" referrerpolicy="no-referrer">`
-      : `<div class="w-16 h-16 shrink-0 border-[2px] border-black bg-cover bg-no-repeat" style="background-image:url('${state.originalOotdImage}');background-position:${match.x}% ${match.y}%"></div>`;
-    const productMeta = product
-      ? `<div class="text-[9px] font-bold mt-1 truncate">${escapeHtml(product.mallName)}${product.price ? ` · ${product.price.toLocaleString()}원` : ''}</div>`
-      : '<div class="text-[9px] font-bold mt-1 opacity-60">유사 상품 검색 준비 중</div>';
-    card.innerHTML = `
-      ${visual}
-      <div class="min-w-0 flex-1">
-        <div class="text-[9px] font-black mb-1">${index === 0 ? 'TOP PICK' : `OPTION ${index + 1}`}</div>
-        <div class="text-xs font-black">${escapeHtml(product?.title || match.recommendItem)}</div>
-        ${productMeta}
-        <div class="flex flex-wrap gap-1">${tags}</div>
-      </div>`;
-    card.addEventListener('click', () => {
-      state.targetMusinsaItem = match.recommendItem;
-      state.worstMatch = match;
-      state.targetMusinsaUrl = product?.link || `https://www.musinsa.com/search/goods?keyword=${encodeURIComponent(match.recommendItem)}`;
-      dom.tooltipContent.textContent = match.name;
-      renderRecommendationCards();
-    });
-    dom.recommendationList.appendChild(card);
-  });
-}
-
-async function loadProductRecommendations() {
-  const queries = state.worstMatches?.slice(0, 3).map((match) => match.recommendItem) || [];
-  if (!queries.length) return;
-  try {
-    const response = await fetch('/api/products', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ queries }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok || !Array.isArray(payload.products)) return;
-    state.productRecommendations = payload.products;
-    const topProduct = state.productRecommendations[0];
-    if (topProduct?.link) {
-      state.targetMusinsaUrl = topProduct.link;
-      state.targetMusinsaItem = topProduct.title || queries[0];
-    }
-    if (!dom.feedbackTooltip.classList.contains('hidden')) renderRecommendationCards();
-  } catch (error) {
-    console.warn('Product image lookup unavailable; using outfit crop fallback.', error);
-  }
-}
-
-function escapeHtml(value) {
-  return String(value).replace(/[&<>'"]/g, (character) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
-  })[character]);
-}
-
-function startStyleEditLoading(recommendItemName) {
-  const loadingTexts = [
-    `${recommendItemName} 픽셀 원단 재단 중...`,
-    '기존 포즈는 얼음! 옷만 몰래 갈아입히는 중...',
-    'AI 재봉틀 초고속 박음질 가동 중...',
-    '얼굴·배경 건드리면 감점이라고 교육 중...',
-    '새 코디의 어색한 주름 다림질 중...',
-    '거울 앞 최종 핏 체크 중... 잠시만요!'
+function startInlineStyleEdit(recommendItemName) {
+  const messages = [
+    `${recommendItemName}만 골라서 바꾸는 중...`,
+    '얼굴·신체·포즈는 원본에 고정 중...',
+    '배경과 다른 의상은 건드리지 않는 중...',
+    '새 의상의 주름과 핏을 정리하는 중...',
   ];
-  const headerWasHidden = dom.appHeader.classList.contains('hidden');
   let step = 0;
-
   hideTooltip();
-  dom.screenResult.classList.remove('active-screen');
-  dom.screenLoading.classList.add('active-screen');
-  dom.appHeader.classList.add('hidden');
-  dom.loadingTitle.textContent = 'AI 스타일 리믹스 중...';
-  dom.loadingStatusText.textContent = loadingTexts[0];
-  dom.loadingProgressFill.style.width = '12%';
-
+  dom.styleEditStatus.textContent = messages[0];
+  dom.styleEditOverlay.classList.remove('hidden');
+  dom.styleEditOverlay.classList.add('flex');
   const interval = setInterval(() => {
-    step = Math.min(step + 1, loadingTexts.length - 1);
-    dom.loadingStatusText.textContent = loadingTexts[step];
-    dom.loadingProgressFill.style.width = `${Math.min(92, 12 + step * 16)}%`;
-    playSound('beep');
-  }, 900);
+    step = Math.min(step + 1, messages.length - 1);
+    dom.styleEditStatus.textContent = messages[step];
+  }, 1000);
 
-  return async (succeeded) => {
+  return () => {
     clearInterval(interval);
-    dom.loadingStatusText.textContent = succeeded
-      ? '새 옷 착붙 완료! 런웨이로 복귀합니다. ✨'
-      : '재봉틀 실이 꼬였습니다. 원래 코디로 복귀합니다. 🧵';
-    dom.loadingProgressFill.style.width = succeeded ? '100%' : '25%';
-    await new Promise((resolve) => setTimeout(resolve, 450));
-    dom.screenLoading.classList.remove('active-screen');
-    dom.screenResult.classList.add('active-screen');
-    if (!headerWasHidden) dom.appHeader.classList.remove('hidden');
+    dom.styleEditOverlay.classList.add('hidden');
+    dom.styleEditOverlay.classList.remove('flex');
   };
 }
 
@@ -737,7 +667,7 @@ async function applyStyleAdvice() {
 
   dom.btnApplyAdvice.disabled = true;
   const recommendItemName = state.targetMusinsaItem || "독일군 스니커즈";
-  const finishLoading = startStyleEditLoading(recommendItemName);
+  const finishLoading = startInlineStyleEdit(recommendItemName);
 
   try {
     const preparedImage = await prepareImageForStyleEdit(state.currentOotdImage);
@@ -766,9 +696,9 @@ async function applyStyleAdvice() {
     state.originalOotdImage ||= state.currentOotdImage;
     state.improvedOotdImage = payload.image;
     state.currentOotdImage = payload.image;
-    await finishLoading(true);
+    finishLoading();
   } catch (error) {
-    await finishLoading(false);
+    finishLoading();
     showToast(aiErrorMessage(error));
     dom.btnApplyAdvice.disabled = false;
     return;
@@ -782,6 +712,10 @@ async function applyStyleAdvice() {
   dom.resultTopOverlayTag.textContent = '개선 이미지';
   dom.imageVersionToggle.classList.remove('hidden');
   dom.reanalyzeImprovedPanel.classList.remove('hidden');
+  dom.improvedShoppingItem.textContent = recommendItemName;
+  dom.improvedShoppingDescription.textContent = state.worstMatch?.name || '';
+  dom.improvedShoppingLink.href = `https://www.musinsa.com/search/goods?keyword=${encodeURIComponent(recommendItemName)}`;
+  dom.improvedShoppingCard.classList.remove('hidden');
   showImageVersion('after');
   showToast('코디 적용 완료! 결과가 자연스러운지 확인한 뒤 다시 분석해 주세요. ✨');
 }
@@ -1116,9 +1050,11 @@ function resetToUploadScreen() {
   state.score = 0;
   state.isPatched = false;
   state.apiData = null; // API 데이터 리셋
-  state.productRecommendations = [];
   dom.imageVersionToggle.classList.add('hidden');
   dom.reanalyzeImprovedPanel.classList.add('hidden');
+  dom.improvedShoppingCard.classList.add('hidden');
+  dom.styleEditOverlay.classList.add('hidden');
+  dom.styleEditOverlay.classList.remove('flex');
   dom.analysisErrorPanel.classList.add('hidden');
   
   // 핀 복원 및 클릭 리스너 청소
@@ -1180,7 +1116,7 @@ function resetToUploadScreen() {
 // 5단계: HTML5 CANVAS INSTAGRAM STORY EXPORTER
 // ========================================================
 
-function exportInstagramStory() {
+async function exportInstagramStory() {
   const canvas = dom.instagramExportCanvas;
   const ctx = canvas.getContext('2d');
   
@@ -1453,19 +1389,14 @@ function exportInstagramStory() {
   ctx.font = 'bold 26px Lexend, sans-serif';
   ctx.fillText(state.isBattleMode ? '대결을 수락하고 덤벼라! @team.letsgo_fit' : '내 친구들은 몇점? @team.letsgo_fit', 540, 1850);
 
-  // 9. 공유 파일에는 결과 화면이나 스토리 카드가 아닌 업로드 사진만 담는다.
-  // 고해상도 원본으로 인한 모바일 메모리 문제를 막기 위해 긴 변을 제한한다.
-  const shareImage = state.isBattleMode ? dom.resultOotdImgChallenger : dom.resultOotdImg;
-  const sourceWidth = shareImage.naturalWidth || shareImage.width;
-  const sourceHeight = shareImage.naturalHeight || shareImage.height;
-  const maxShareDimension = 2160;
-  const scale = Math.min(1, maxShareDimension / Math.max(sourceWidth, sourceHeight));
-
-  canvas.width = Math.max(1, Math.round(sourceWidth * scale));
-  canvas.height = Math.max(1, Math.round(sourceHeight * scale));
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(shareImage, 0, 0, canvas.width, canvas.height);
+  // 9. 최종 공유 카드는 사진, 점수, 상황, 티어와 팀 소개만 간결하게 담는다.
+  let shareImage = state.isBattleMode ? dom.resultOotdImgChallenger : dom.resultOotdImg;
+  if (!state.isBattleMode && state.improvedOotdImage) {
+    shareImage = new Image();
+    shareImage.src = state.improvedOotdImage;
+    await shareImage.decode();
+  }
+  drawFinalShareCard(ctx, canvas, shareImage);
 
   // 10. 이미지 다운로드 트리거 및 모달 오픈
   setTimeout(() => {
@@ -1495,6 +1426,53 @@ function exportInstagramStory() {
       showToast("이미지 렌더링에 실패했습니다. (CORS 보안 설정 우려)");
     }
   }, 100);
+}
+
+function drawFinalShareCard(ctx, canvas, image) {
+  canvas.width = 1080;
+  canvas.height = 1920;
+  const background = ctx.createLinearGradient(0, 0, 1080, 1920);
+  background.addColorStop(0, '#eae6ff');
+  background.addColorStop(1, '#ffefea');
+  ctx.fillStyle = background;
+  ctx.fillRect(0, 0, 1080, 1920);
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 24;
+  ctx.strokeRect(12, 12, 1056, 1896);
+
+  ctx.fillStyle = '#000';
+  ctx.textAlign = 'center';
+  ctx.font = '900 70px Montserrat, sans-serif';
+  ctx.fillText('FITCHECK!', 540, 105);
+
+  const frame = { x: 90, y: 155, width: 900, height: 1240 };
+  ctx.fillStyle = '#000';
+  ctx.fillRect(frame.x + 14, frame.y + 14, frame.width, frame.height);
+  ctx.fillStyle = '#eee';
+  ctx.fillRect(frame.x, frame.y, frame.width, frame.height);
+  const sourceWidth = image.naturalWidth || image.width;
+  const sourceHeight = image.naturalHeight || image.height;
+  const scale = Math.min(frame.width / sourceWidth, frame.height / sourceHeight);
+  const width = sourceWidth * scale;
+  const height = sourceHeight * scale;
+  ctx.drawImage(image, frame.x + (frame.width - width) / 2, frame.y + (frame.height - height) / 2, width, height);
+  ctx.lineWidth = 10;
+  ctx.strokeRect(frame.x, frame.y, frame.width, frame.height);
+
+  ctx.fillStyle = '#fff9e6';
+  ctx.fillRect(90, 1445, 900, 235);
+  ctx.lineWidth = 8;
+  ctx.strokeRect(90, 1445, 900, 235);
+  ctx.fillStyle = '#000';
+  ctx.font = '900 72px Montserrat, sans-serif';
+  ctx.fillText(`${state.score.toLocaleString()} / 10K`, 540, 1545);
+  ctx.font = '700 34px Lexend, sans-serif';
+  ctx.fillText(`상황: ${state.selectedTpo}  ·  티어: ${state.tier}`, 540, 1625);
+
+  ctx.font = '900 34px Montserrat, sans-serif';
+  ctx.fillText('@team.letsgo_fit', 540, 1790);
+  ctx.font = '700 25px Lexend, sans-serif';
+  ctx.fillText('패션을 더 재밌게, 오늘의 OOTD를 함께 체크해요.', 540, 1840);
 }
 
 // 텍스트 여러 줄 정렬 도우미
