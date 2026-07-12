@@ -80,6 +80,9 @@ const dom = {
   reanalyzeImprovedPanel: document.getElementById('reanalyze-improved-panel'),
   styleEditOverlay: document.getElementById('style-edit-overlay'),
   styleEditStatus: document.getElementById('style-edit-status'),
+  styleEditScorePanel: document.getElementById('style-edit-score-panel'),
+  styleEditScore: document.getElementById('style-edit-score'),
+  styleEditScoreDelta: document.getElementById('style-edit-score-delta'),
   improvedShoppingCard: document.getElementById('improved-shopping-card'),
   improvedShoppingItem: document.getElementById('improved-shopping-item'),
   improvedShoppingDescription: document.getElementById('improved-shopping-description'),
@@ -322,13 +325,13 @@ function handleCustomFileUpload(e) {
 }
 
 // API 호출 및 다중 폴백 로직
-async function callAnalyzeAPI(imageBase64, tpo) {
+async function callAnalyzeAPI(imageBase64, tpo, improvementContext = null) {
   let response;
   try {
     response = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageBase64, tpo }),
+      body: JSON.stringify({ imageBase64, tpo, improvementContext }),
     });
   } catch (error) {
     throw new ApiRequestError(
@@ -637,16 +640,23 @@ function hideTooltip() {
 }
 
 
-function startInlineStyleEdit(recommendItemName) {
-  const messages = [
-    `${recommendItemName}만 골라서 바꾸는 중...`,
-    '얼굴·신체·포즈는 원본에 고정 중...',
-    '배경과 다른 의상은 건드리지 않는 중...',
-    '새 의상의 주름과 핏을 정리하는 중...',
+function startInlineStyleEdit(recommendItemName, mode = 'edit') {
+  const messages = mode === 'analyze' ? [
+    '개선된 코디를 다시 스캔하는 중...',
+    '새로운 패션력과 티어 계산 중...',
+    '스탯 상승 폭을 비교하는 중...',
+    '최종 성적표 정리 중...',
+  ] : [
+    `${recommendItemName} 코디 시뮬레이션 가동 중...`,
+    '새 아이템의 핏과 주름 다듬는 중...',
+    '전체 코디 밸런스 최종 점검 중...',
+    '패션력 재측정 준비 중...',
   ];
   let step = 0;
   hideTooltip();
   dom.styleEditStatus.textContent = messages[0];
+  dom.styleEditScorePanel.classList.add('hidden');
+  dom.styleEditScoreDelta.textContent = '';
   dom.styleEditOverlay.classList.remove('hidden');
   dom.styleEditOverlay.classList.add('flex');
   const interval = setInterval(() => {
@@ -661,12 +671,34 @@ function startInlineStyleEdit(recommendItemName) {
   };
 }
 
+function animateInlineScore(from, to) {
+  dom.styleEditScorePanel.classList.remove('hidden');
+  const delta = to - from;
+  dom.styleEditScoreDelta.textContent = delta >= 0 ? `+${delta.toLocaleString()} UP!` : `${delta.toLocaleString()}`;
+  dom.styleEditStatus.textContent = delta > 0
+    ? '코디 시너지 감지! 패션력이 쫘자작 올라갑니다 ⚡'
+    : '새 코디 점수를 꼼꼼하게 반영했어요.';
+  const startedAt = performance.now();
+  return new Promise((resolve) => {
+    const tick = (now) => {
+      const progress = Math.min(1, (now - startedAt) / 1100);
+      const eased = 1 - ((1 - progress) ** 3);
+      dom.styleEditScore.textContent = Math.round(from + ((to - from) * eased)).toLocaleString();
+      if (progress < 1) requestAnimationFrame(tick);
+      else resolve();
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
 // 추천 코디 적용 (실시간 Rescoring 및 가상 대체)
 async function applyStyleAdvice() {
   if (state.isPatched) return;
 
   dom.btnApplyAdvice.disabled = true;
   const recommendItemName = state.targetMusinsaItem || "독일군 스니커즈";
+  const previousScore = state.score;
+  const previousStats = new Map(state.stats.map((stat) => [stat.name, stat.val]));
   const finishLoading = startInlineStyleEdit(recommendItemName);
 
   try {
@@ -696,6 +728,21 @@ async function applyStyleAdvice() {
     state.originalOotdImage ||= state.currentOotdImage;
     state.improvedOotdImage = payload.image;
     state.currentOotdImage = payload.image;
+
+    dom.styleEditStatus.textContent = '새 코디 패션력과 스탯 다시 측정 중...';
+    try {
+      const analysis = await callAnalyzeAPI(payload.image, state.selectedTpo, {
+        item: recommendItemName,
+        previousScore,
+      });
+      applyImprovedAnalysis(analysis, previousStats);
+      await animateInlineScore(previousScore, state.score);
+      dom.reanalyzeImprovedPanel.classList.add('hidden');
+    } catch (analysisError) {
+      console.warn('Improved image analysis failed.', analysisError);
+      dom.reanalyzeImprovedPanel.classList.remove('hidden');
+      showToast(`${aiErrorMessage(analysisError)} 개선 이미지는 적용됐으니 다시 분석해 주세요.`);
+    }
     finishLoading();
   } catch (error) {
     finishLoading();
@@ -711,11 +758,12 @@ async function applyStyleAdvice() {
   document.querySelectorAll('[data-pin-type]').forEach((pin) => pin.classList.add('hidden'));
   dom.resultTopOverlayTag.textContent = '개선 이미지';
   dom.imageVersionToggle.classList.remove('hidden');
-  dom.reanalyzeImprovedPanel.classList.remove('hidden');
   dom.improvedShoppingItem.textContent = recommendItemName;
-  dom.improvedShoppingDescription.textContent = state.worstMatch?.name || '';
+  dom.improvedShoppingDescription.textContent = state.apiData?.improvementSummary
+    || `${recommendItemName}(으)로 갈아입혀 ${state.selectedTpo} 무드와 전체 밸런스가 한층 또렷해졌어요. 문제 아이템은 퇴근 완료!`;
   dom.improvedShoppingLink.href = `https://www.musinsa.com/search/goods?keyword=${encodeURIComponent(recommendItemName)}`;
   dom.improvedShoppingCard.classList.remove('hidden');
+  dom.pinInteractionGuide.classList.add('hidden');
   showImageVersion('after');
   showToast('코디 적용 완료! 결과가 자연스러운지 확인한 뒤 다시 분석해 주세요. ✨');
 }
@@ -729,38 +777,50 @@ function showImageVersion(version) {
   dom.resultTopOverlayTag.textContent = showBefore ? '원본' : '개선 이미지';
 }
 
+function applyImprovedAnalysis(analysis, previousStats) {
+  state.apiData = analysis;
+  state.score = analysis.score;
+  state.tier = analysis.tier;
+  state.bestMatches = analysis.bestMatches;
+  state.worstMatches = analysis.worstMatches;
+  state.bestMatch = analysis.bestMatches[0];
+  state.worstMatch = analysis.worstMatches[0];
+  state.musinsaQuery = analysis.musinsaQuery;
+  state.stats = Object.entries(analysis.stats).map(([name, val]) => ({
+    name,
+    val,
+    originalVal: previousStats.get(name) ?? val,
+  }));
+  state.isPatched = true;
+  dom.resultScoreNum.textContent = state.score.toLocaleString();
+  dom.resultTierName.textContent = state.tier;
+  dom.resultRoastText.textContent = analysis.roast;
+  renderVibeStats();
+}
+
 async function reanalyzeImprovedImage() {
   if (!state.improvedOotdImage) return;
-  state.currentOotdImage = state.improvedOotdImage;
+  const previousScore = state.score;
+  const previousStats = new Map(state.stats.map((stat) => [stat.name, stat.val]));
   dom.btnReanalyzeImproved.disabled = true;
-  dom.screenResult.classList.remove('active-screen');
-  dom.screenLoading.classList.add('active-screen');
-  dom.analysisErrorPanel.classList.add('hidden');
-  dom.loadingProgressFill.classList.remove('bg-error', 'border-error');
-  dom.loadingProgressFill.classList.add('bg-secondary', 'border-black');
-  dom.loadingTitle.textContent = '개선 이미지 재분석 중...';
-  dom.loadingStatusText.textContent = '새 코디를 처음부터 다시 채점하고 있어요. 🔍';
-  dom.loadingProgressFill.style.width = '35%';
+  const finishLoading = startInlineStyleEdit(state.targetMusinsaItem, 'analyze');
 
   try {
-    state.apiData = await callAnalyzeAPI(state.improvedOotdImage, state.selectedTpo);
-    dom.loadingProgressFill.style.width = '100%';
-    calculateFashionResults();
-    dom.imageVersionToggle.classList.remove('hidden');
+    const analysis = await callAnalyzeAPI(state.improvedOotdImage, state.selectedTpo, {
+      item: state.targetMusinsaItem,
+      previousScore,
+    });
+    applyImprovedAnalysis(analysis, previousStats);
+    await animateInlineScore(previousScore, state.score);
     dom.reanalyzeImprovedPanel.classList.add('hidden');
-    showImageVersion('after');
-    dom.screenLoading.classList.remove('active-screen');
-    dom.screenResult.classList.add('active-screen');
-    showToast('개선 이미지 재분석 완료! 새 점수를 확인해 보세요. 🎯');
+    dom.improvedShoppingDescription.textContent = analysis.improvementSummary
+      || `${state.targetMusinsaItem}(으)로 코디 밸런스를 다시 세웠어요. 패션 구조대 임무 완료!`;
+    showToast('개선 이미지 재분석 완료! 새 점수와 UP 스탯을 확인해 보세요. 🎯');
   } catch (error) {
-    dom.loadingTitle.textContent = '재분석을 완료하지 못했어요';
-    dom.loadingStatusText.textContent = aiErrorMessage(error);
-    dom.analysisErrorMessage.textContent = aiErrorMessage(error);
-    dom.loadingProgressFill.style.width = '100%';
-    dom.loadingProgressFill.classList.remove('bg-secondary', 'border-black');
-    dom.loadingProgressFill.classList.add('bg-error', 'border-error');
-    dom.analysisErrorPanel.classList.remove('hidden');
+    showToast(aiErrorMessage(error));
+    dom.reanalyzeImprovedPanel.classList.remove('hidden');
   } finally {
+    finishLoading();
     dom.btnReanalyzeImproved.disabled = false;
   }
 }
@@ -929,11 +989,6 @@ function renderVibeStats() {
       ]
     };
     state.stats = statsMapping[tpo] || statsMapping['일상'];
-  } else {
-    // API 분석 결과가 있는 경우, getMutedStatVal을 호출하여 isPatched 상향 보정(+15) 적용
-    state.stats.forEach(stat => {
-      stat.val = getMutedStatVal(stat.originalVal, 0, 100);
-    });
   }
 
   dom.statsContainer.innerHTML = '';
@@ -942,6 +997,8 @@ function renderVibeStats() {
     // 5대 교차 컬러 배치 (Lavender, Mint, Peach, Cream, White)
     const colorClasses = ['bg-primary', 'bg-secondary', 'bg-tertiary', 'bg-cream', 'bg-white'];
     const barColor = colorClasses[idx % colorClasses.length];
+    const baseline = Math.min(stat.originalVal, stat.val);
+    const gain = Math.max(0, stat.val - baseline);
 
     const statItem = document.createElement('div');
     statItem.className = "flex flex-col gap-1 cursor-pointer group w-full";
@@ -949,9 +1006,10 @@ function renderVibeStats() {
       <div class="flex items-center gap-2 w-full hover:translate-x-[2px] transition-transform">
         <span class="w-24 font-bold text-xs uppercase tracking-tight text-black">${stat.name}</span>
         <div class="flex-1 h-5 border-[3px] border-black bg-white flex overflow-hidden">
-          <div class="stat-bar-fill ${barColor} border-r-[3px] border-black h-full transition-all duration-1000" style="width: 0%;"></div>
+          <div class="stat-bar-base ${barColor} h-full transition-all duration-700" style="width: 0%;"></div>
+          <div class="stat-bar-gain bg-error h-full transition-all duration-700" style="width: 0%;"></div>
         </div>
-        <span class="w-8 text-right text-xs font-headline font-black text-black">${stat.val}%</span>
+        <span class="w-14 text-right text-xs font-headline font-black text-black">${stat.val}%${gain ? `<small class="block text-[8px] text-error">+${gain} UP!</small>` : ''}</span>
       </div>
       <div class="stat-desc-container hidden w-full"></div>
     `;
@@ -982,8 +1040,10 @@ function renderVibeStats() {
     
     // 약간의 딜레이 후 애니메이션 차오르게 조정
     setTimeout(() => {
-      const fillEl = statItem.querySelector('.stat-bar-fill');
-      if (fillEl) fillEl.style.width = `${stat.val}%`;
+      const baseEl = statItem.querySelector('.stat-bar-base');
+      const gainEl = statItem.querySelector('.stat-bar-gain');
+      if (baseEl) baseEl.style.width = `${baseline}%`;
+      if (gainEl) gainEl.style.width = `${gain}%`;
     }, 50);
   });
 }
@@ -991,7 +1051,6 @@ function renderVibeStats() {
 // 스탯 백분율 안정화 도우미
 function getMutedStatVal(formulaVal, min, max) {
   let val = Math.floor(formulaVal);
-  if (state.isPatched) val += 15; // 코디 적용 시 상향 보정
   return Math.max(min, Math.min(max, val));
 }
 

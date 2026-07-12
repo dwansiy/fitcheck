@@ -34,6 +34,7 @@ export const OUTFIT_RESULT_SCHEMA = Object.freeze({
     bestMatches: { type: 'array', items: MATCH_SCHEMA, minItems: 1, maxItems: 1 },
     worstMatches: { type: 'array', items: WORST_MATCH_SCHEMA, minItems: 1, maxItems: 3 },
     musinsaQuery: { type: 'string' },
+    improvementSummary: { type: 'string' },
     stats: {
       type: 'object',
       additionalProperties: { type: 'integer', minimum: 0, maximum: 100 },
@@ -108,6 +109,7 @@ function normalizeOutfitResult(result) {
     bestMatches: bestSource.map((match) => normalizeMatch(match)).filter(Boolean).slice(0, 1),
     worstMatches: worstMatches.slice(0, 3),
     musinsaQuery: cleanText(result.musinsaQuery) || worstMatches[0]?.recommendItem || '',
+    improvementSummary: cleanText(result.improvementSummary),
     stats,
   };
 }

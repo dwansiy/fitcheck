@@ -11,6 +11,12 @@ export async function onRequestPost(context) {
     const { request, env } = context;
     const body = await request.json();
     const { imageBase64, tpo } = body;
+    const improvementItem = typeof body.improvementContext?.item === 'string'
+      ? body.improvementContext.item.replace(/[\r\n]+/g, ' ').trim().slice(0, 100)
+      : '';
+    const previousScore = Number.isInteger(body.improvementContext?.previousScore)
+      ? body.improvementContext.previousScore
+      : null;
 
     const image = parseDataUrl(imageBase64);
     if (!image || !ALLOWED_TPOS.has(tpo)) return jsonResponse({ error: '사진과 올바른 TPO가 필요합니다.' }, 400);
@@ -26,6 +32,11 @@ export async function onRequestPost(context) {
 
 [TPO 상황]
 ${tpo}
+
+${improvementItem ? `[개선본 재평가]
+이 사진은 기존 착장에서 ${improvementItem}(으)로 의상을 교체한 개선본입니다.
+기존 점수는 ${previousScore ?? '알 수 없음'}점입니다. 실제 사진에서 교체가 자연스럽고 TPO와 조화로워졌다면 score는 기존 점수보다 높게 평가하고, 좋아진 각 stats에도 실제 개선 폭을 반영하세요. 교체가 실패했거나 부자연스러울 때만 점수를 올리지 말고 보이지 않는 개선을 지어내지는 마세요.
+improvementSummary에는 해당 아이템이 이전 문제를 어떻게 해결했는지 위트 있고 긍정적인 한 문장으로 설명하세요.` : ''}
 
 [분석 및 응답 기준]
 1. 패션력 점수(score): 0 ~ 10,000점 범위로 정수로만 평가해 주세요.
