@@ -35,6 +35,8 @@ export const OUTFIT_RESULT_SCHEMA = Object.freeze({
     worstMatches: { type: 'array', items: WORST_MATCH_SCHEMA, minItems: 1, maxItems: 3 },
     musinsaQuery: { type: 'string' },
     improvementSummary: { type: 'string' },
+    editAccepted: { type: 'boolean' },
+    comparisonSummary: { type: 'string' },
     stats: {
       type: 'object',
       additionalProperties: { type: 'integer', minimum: 0, maximum: 100 },
@@ -55,7 +57,7 @@ export function getStatKeysForTpo(tpo) {
   return STAT_KEYS_BY_TPO[tpo] || [];
 }
 
-export function parseOutfitResult(response, tpo) {
+export function parseOutfitResult(response, tpo, options = {}) {
   const candidate = response?.candidates?.[0];
   const blocked = candidate?.finishReason === 'SAFETY'
     || response?.promptFeedback?.blockReason === 'SAFETY';
@@ -78,7 +80,7 @@ export function parseOutfitResult(response, tpo) {
   }
 
   const normalized = normalizeOutfitResult(result, tpo);
-  validateOutfitResult(normalized);
+  validateOutfitResult(normalized, options);
   return normalized;
 }
 
@@ -127,11 +129,13 @@ function normalizeOutfitResult(result, tpo) {
     worstMatches: worstMatches.slice(0, 3),
     musinsaQuery: cleanText(result.musinsaQuery) || worstMatches[0]?.recommendItem || '',
     improvementSummary: cleanText(result.improvementSummary),
+    editAccepted: typeof result.editAccepted === 'boolean' ? result.editAccepted : null,
+    comparisonSummary: cleanText(result.comparisonSummary),
     stats,
   };
 }
 
-function validateOutfitResult(result) {
+function validateOutfitResult(result, { requireEditDecision = false } = {}) {
   const isIntegerInRange = (value, min, max) => Number.isInteger(value) && value >= min && value <= max;
   const isNonEmptyText = (value) => typeof value === 'string' && value.trim().length > 0;
   const isMatch = (value, withRecommendation = false) => value
@@ -157,6 +161,7 @@ function validateOutfitResult(result) {
       && match.reasonTags.length >= 1
       && match.reasonTags.every(isNonEmptyText))
     && isNonEmptyText(result.musinsaQuery)
+    && (!requireEditDecision || typeof result.editAccepted === 'boolean')
     && Array.isArray(stats)
     && stats.length === 5
     && stats.every(([name, score]) => isNonEmptyText(name) && isIntegerInRange(score, 0, 100));

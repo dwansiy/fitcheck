@@ -131,6 +131,14 @@
       <p class="text-[11px] leading-relaxed text-black/70 text-center px-2">
         측정 및 이미지 개선을 실행하면 선택한 사진이 분석을 위해 Google Gemini 또는 Cloudflare Workers AI로 전송됩니다. 사진은 결과 생성 목적으로만 처리되며 FitCheck 서버에 별도로 저장하지 않습니다.
       </p>
+
+      <div id="recent-results-card" class="hidden w-full bg-white border-[3px] border-black p-4 neo-shadow">
+        <div class="flex items-center justify-between gap-2 mb-3">
+          <h3 class="font-headline text-sm font-black">최근 패션 기록</h3>
+          <span class="text-[9px] font-bold text-on-surface-variant">사진은 저장하지 않아요 🔒</span>
+        </div>
+        <div id="recent-results-list" class="flex flex-col gap-2"></div>
+      </div>
     </section>
 
 
@@ -305,6 +313,12 @@
             <div class="inline-flex items-center gap-1.5 bg-cream border-[3px] border-black px-4 py-1.5 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transform rotate-[1deg]">
               <span class="text-xs font-black uppercase">티어:</span>
               <span id="result-tier-name" class="font-headline text-xs font-black tracking-wider text-black">골드</span>
+            </div>
+
+            <div id="achievement-card" class="hidden mt-4 bg-primary border-[3px] border-black p-3 text-left shadow-[3px_3px_0_#000] rotate-[-1deg]">
+              <p class="text-[9px] font-black uppercase">🏆 오늘의 칭호 · 업적 해금</p>
+              <p id="achievement-title" class="font-headline text-base font-black mt-1"></p>
+              <p id="achievement-description" class="text-[10px] font-bold mt-1"></p>
             </div>
 
           </div>

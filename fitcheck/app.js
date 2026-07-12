@@ -31,11 +31,14 @@ const state = {
   // AI API 결과 임시 보관
   apiData: null,
   improvementChanges: [],
+  achievement: null,
+  currentRecordId: null,
 };
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const MAX_ANALYSIS_IMAGE_DIMENSION = 1600;
 const ALLOWED_UPLOAD_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const RECENT_RESULTS_KEY = 'fitcheck.recentResults.v1';
 
 // 2. DOM 요소 셀렉터
 const dom = {
@@ -59,6 +62,8 @@ const dom = {
   tpoChips: document.querySelectorAll('.tpo-chip'),
   btnSubmitScan: document.getElementById('btn-submit-scan'),
   btnTrySample: document.getElementById('btn-try-sample'),
+  recentResultsCard: document.getElementById('recent-results-card'),
+  recentResultsList: document.getElementById('recent-results-list'),
   
   // 로딩 화면
   loadingTitle: document.getElementById('loading-title'),
@@ -100,6 +105,9 @@ const dom = {
   
   resultScoreNum: document.getElementById('result-score-num'),
   resultTierName: document.getElementById('result-tier-name'),
+  achievementCard: document.getElementById('achievement-card'),
+  achievementTitle: document.getElementById('achievement-title'),
+  achievementDescription: document.getElementById('achievement-description'),
   resultRoastText: document.getElementById('result-roast-text'),
   vibeCheckTitle: document.getElementById('vibe-check-title'),
   statsContainer: document.getElementById('stats-container'),
@@ -143,6 +151,7 @@ const dom = {
 
 function init() {
   bindEvents();
+  renderRecentResults();
   if (localStorage.getItem('fitcheck.fullBodyGuideSeen') !== '1') {
     dom.firstVisitGuide.classList.remove('hidden');
   }
@@ -392,13 +401,13 @@ function rejectImageUpload(message) {
 }
 
 // API 호출 및 다중 폴백 로직
-async function callAnalyzeAPI(imageBase64, tpo, improvementContext = null) {
+async function callAnalyzeAPI(imageBase64, tpo, improvementContext = null, comparisonImageBase64 = null) {
   let response;
   try {
     response = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageBase64, tpo, improvementContext }),
+      body: JSON.stringify({ imageBase64, tpo, improvementContext, comparisonImageBase64 }),
     });
   } catch (error) {
     throw new ApiRequestError(
@@ -567,6 +576,8 @@ function calculateFashionResults() {
     originalVal: val,
     higherIsBetter: getStatMetadata(name).higherIsBetter,
   }));
+  updateAchievement();
+  saveRecentResult({ improved: false });
 
   // 비주얼 이미지 및 배틀 레이아웃 세팅
   if (state.isBattleMode) {
@@ -840,12 +851,22 @@ async function applyStyleAdvice() {
 
     dom.styleEditStatus.textContent = '새 코디 패션력과 스탯 다시 측정 중...';
     try {
-      const analysis = await callAnalyzeAPI(payload.image, state.selectedTpo, {
-        item: recommendItemName,
-        previousScore,
-      });
+      const analysis = await callAnalyzeAPI(
+        payload.image,
+        state.selectedTpo,
+        { item: recommendItemName, previousScore },
+        state.originalOotdImage,
+      );
+      if (analysis.editAccepted === false) {
+        throw new ApiRequestError(
+          'STYLE_EDIT_REJECTED',
+          '원본과 다른 부분이 너무 많이 바뀌어 이번 개선은 적용하지 않았어요. 다른 개선 포인트로 시도해 주세요.',
+        );
+      }
       applyImprovedAnalysis(analysis, previousStats);
       renderImprovementChangeSummary(previousScore, recommendItemName);
+      updateAchievement();
+      saveRecentResult({ improved: true });
       await animateInlineScore(previousScore, state.score);
     } catch (analysisError) {
       console.warn('Improved image analysis failed.', analysisError);
@@ -947,6 +968,94 @@ function renderImprovementChangeSummary(previousScore, recommendItemName) {
     dom.improvementChangeItems.appendChild(chip);
   });
   dom.improvementChangeSummary.classList.toggle('hidden', state.improvementChanges.length === 0);
+}
+
+const ACHIEVEMENT_TITLE_POOLS = Object.freeze({
+  '일상': ['꾸안꾸 연금술사', '동네 런웨이 지배자', '마실 패션 대장'],
+  '데이트': ['심쿵 유발 용의자', '애프터 예약 완료', '로맨스 드레스 코드 해커'],
+  '출근': ['출근룩 최종 결재자', '부장님 레이더 회피왕', '오피스 아우라 CEO'],
+  '운동': ['오운완 비주얼 센터', '거울존 지배자', '근손실 방어 패셔니스타'],
+  '하객': ['민폐 차단 하객왕', '단체사진 생존자', '피로연 드레스 코드 수호자'],
+});
+
+function updateAchievement() {
+  const titles = ACHIEVEMENT_TITLE_POOLS[state.selectedTpo] || ACHIEVEMENT_TITLE_POOLS['일상'];
+  const seedSource = `${state.selectedTpo}:${state.score}:${state.worstMatches?.length || 0}`;
+  const seed = Array.from(seedSource).reduce((sum, character) => sum + character.codePointAt(0), 0);
+  const title = titles[seed % titles.length];
+  const description = state.isPatched
+    ? `리믹스로 ${state.tier} 진입! 오늘의 코디 서사가 한 단계 진화했습니다.`
+    : state.score >= 9000
+      ? '패션 챌린저 구역 입성. 오늘만큼은 거리가 당신의 런웨이입니다.'
+      : state.score >= 7500
+        ? '다이아 감도 포착. 친구가 어디서 샀냐고 물을 확률이 높습니다.'
+        : state.score >= 6000
+          ? '골드 기본기 인증. 개선 포인트 하나면 다음 티어가 보입니다.'
+          : '성장형 패셔니스타 발견. 악마 핀을 누르면 반전 서사가 시작됩니다.';
+
+  state.achievement = { title, description };
+  dom.achievementTitle.textContent = title;
+  dom.achievementDescription.textContent = description;
+  dom.achievementCard.classList.remove('hidden');
+}
+
+function loadRecentResults() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RECENT_RESULTS_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed.slice(0, 3) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecentResult({ improved = false } = {}) {
+  try {
+    const records = loadRecentResults();
+    state.currentRecordId ||= `${Date.now()}-${state.score}`;
+    const previous = records.find((record) => record.id === state.currentRecordId);
+    const record = {
+      id: state.currentRecordId,
+      createdAt: previous?.createdAt || Date.now(),
+      updatedAt: Date.now(),
+      tpo: state.selectedTpo,
+      score: state.score,
+      tier: state.tier,
+      title: state.achievement?.title || '',
+      improved,
+    };
+    const nextRecords = [record, ...records.filter((item) => item.id !== state.currentRecordId)];
+    localStorage.setItem(RECENT_RESULTS_KEY, JSON.stringify(nextRecords.slice(0, 3)));
+    renderRecentResults();
+  } catch (error) {
+    console.warn('Recent result could not be saved.', error);
+  }
+}
+
+function renderRecentResults() {
+  const records = loadRecentResults();
+  dom.recentResultsList.textContent = '';
+  records.forEach((record) => {
+    const row = document.createElement('div');
+    row.className = 'border-[2px] border-black bg-cream px-3 py-2 flex items-center justify-between gap-3';
+
+    const copy = document.createElement('div');
+    copy.className = 'min-w-0';
+    const title = document.createElement('p');
+    title.className = 'font-headline text-[11px] font-black truncate';
+    title.textContent = record.title || `${record.tpo} 코디 도전자`;
+    const meta = document.createElement('p');
+    meta.className = 'text-[9px] font-bold text-on-surface-variant';
+    const date = new Date(record.updatedAt || record.createdAt).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' });
+    meta.textContent = `${date} · ${record.tpo} · ${record.tier}${record.improved ? ' · 개선 완료' : ''}`;
+    copy.append(title, meta);
+
+    const score = document.createElement('strong');
+    score.className = 'font-headline text-sm font-black shrink-0';
+    score.textContent = record.score.toLocaleString();
+    row.append(copy, score);
+    dom.recentResultsList.appendChild(row);
+  });
+  dom.recentResultsCard.classList.toggle('hidden', records.length === 0);
 }
 
 async function prepareImageForStyleEdit(dataUrl) {
@@ -1275,9 +1384,12 @@ function resetToUploadScreen() {
   state.isPatched = false;
   state.apiData = null; // API 데이터 리셋
   state.improvementChanges = [];
+  state.achievement = null;
+  state.currentRecordId = null;
   dom.imageVersionToggle.classList.add('hidden');
   dom.improvedShoppingCard.classList.add('hidden');
   dom.improvementChangeSummary.classList.add('hidden');
+  dom.achievementCard.classList.add('hidden');
   dom.devilSummaryCard.classList.add('hidden');
   dom.styleEditOverlay.classList.add('hidden');
   dom.styleEditOverlay.classList.remove('flex');
