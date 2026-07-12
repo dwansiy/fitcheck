@@ -9,6 +9,21 @@ const MATCH_SCHEMA = Object.freeze({
   required: ['name', 'x', 'y'],
 });
 
+const WORST_MATCH_SCHEMA = Object.freeze({
+  ...MATCH_SCHEMA,
+  properties: {
+    ...MATCH_SCHEMA.properties,
+    recommendItem: { type: 'string' },
+    reasonTags: {
+      type: 'array',
+      items: { type: 'string' },
+      minItems: 2,
+      maxItems: 3,
+    },
+  },
+  required: [...MATCH_SCHEMA.required, 'recommendItem', 'reasonTags'],
+});
+
 export const OUTFIT_RESULT_SCHEMA = Object.freeze({
   type: 'object',
   additionalProperties: false,
@@ -16,22 +31,15 @@ export const OUTFIT_RESULT_SCHEMA = Object.freeze({
     score: { type: 'integer', minimum: 0, maximum: 10000 },
     tier: { type: 'string' },
     roast: { type: 'string' },
-    bestMatch: MATCH_SCHEMA,
-    worstMatch: {
-      ...MATCH_SCHEMA,
-      properties: {
-        ...MATCH_SCHEMA.properties,
-        recommendItem: { type: 'string' },
-      },
-      required: [...MATCH_SCHEMA.required, 'recommendItem'],
-    },
+    bestMatches: { type: 'array', items: MATCH_SCHEMA, minItems: 3, maxItems: 4 },
+    worstMatches: { type: 'array', items: WORST_MATCH_SCHEMA, minItems: 3, maxItems: 4 },
     musinsaQuery: { type: 'string' },
     stats: {
       type: 'object',
       additionalProperties: { type: 'integer', minimum: 0, maximum: 100 },
     },
   },
-  required: ['score', 'tier', 'roast', 'bestMatch', 'worstMatch', 'musinsaQuery', 'stats'],
+  required: ['score', 'tier', 'roast', 'bestMatches', 'worstMatches', 'musinsaQuery', 'stats'],
 });
 
 export function parseOutfitResult(response) {
@@ -74,8 +82,17 @@ function validateOutfitResult(result) {
     && isIntegerInRange(result.score, 0, 10000)
     && isNonEmptyText(result.tier)
     && isNonEmptyText(result.roast)
-    && isMatch(result.bestMatch)
-    && isMatch(result.worstMatch, true)
+    && Array.isArray(result.bestMatches)
+    && result.bestMatches.length >= 3
+    && result.bestMatches.length <= 4
+    && result.bestMatches.every((match) => isMatch(match))
+    && Array.isArray(result.worstMatches)
+    && result.worstMatches.length >= 3
+    && result.worstMatches.length <= 4
+    && result.worstMatches.every((match) => isMatch(match, true)
+      && Array.isArray(match.reasonTags)
+      && match.reasonTags.length >= 2
+      && match.reasonTags.every(isNonEmptyText))
     && isNonEmptyText(result.musinsaQuery)
     && Array.isArray(stats)
     && stats.length === 5

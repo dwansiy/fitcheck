@@ -7,6 +7,8 @@ const state = {
   activeScreen: 'screen-upload',
   selectedTpo: '일상',          // 디폴트 상황: '일상'
   currentOotdImage: null,      // 사용자가 업로드한 OOTD 이미지 Base64 데이터
+  originalOotdImage: null,
+  improvedOotdImage: null,
   
   // 측정 결과 데이터
   score: 0,
@@ -27,7 +29,8 @@ const state = {
   targetMusinsaItem: '독일군 스니커즈',
 
   // AI API 결과 임시 보관
-  apiData: null
+  apiData: null,
+  productRecommendations: [],
 };
 
 // 2. DOM 요소 셀렉터
@@ -54,6 +57,9 @@ const dom = {
   loadingTitle: document.getElementById('loading-title'),
   loadingStatusText: document.getElementById('loading-status-text'),
   loadingProgressFill: document.getElementById('loading-progress-fill'),
+  analysisErrorPanel: document.getElementById('analysis-error-panel'),
+  analysisErrorMessage: document.getElementById('analysis-error-message'),
+  btnAnalysisRetry: document.getElementById('btn-analysis-retry'),
   
   // 결과 화면
   resultOotdImg: document.getElementById('result-ootd-img'),
@@ -63,10 +69,15 @@ const dom = {
   feedbackTooltip: document.getElementById('feedback-tooltip'),
   tooltipTitle: document.getElementById('tooltip-title'),
   tooltipContent: document.getElementById('tooltip-content'),
+  recommendationList: document.getElementById('recommendation-list'),
   btnCloseTooltip: document.getElementById('btn-close-tooltip'),
   linkShopping: document.getElementById('link-shopping'),
   btnApplyAdvice: document.getElementById('btn-apply-advice'),
-  bonusScoreBadge: document.getElementById('bonus-score-badge'),
+  imageVersionToggle: document.getElementById('image-version-toggle'),
+  btnShowBefore: document.getElementById('btn-show-before'),
+  btnShowAfter: document.getElementById('btn-show-after'),
+  btnReanalyzeImproved: document.getElementById('btn-reanalyze-improved'),
+  reanalyzeImprovedPanel: document.getElementById('reanalyze-improved-panel'),
   
   resultScoreNum: document.getElementById('result-score-num'),
   resultTierName: document.getElementById('result-tier-name'),
@@ -181,12 +192,22 @@ function bindEvents() {
   dom.btnSubmitScan.addEventListener('click', startScanningSequence);
 
   // 5. 결과창 Angel/Devil 마커 클릭
-  dom.pinAngel.addEventListener('click', () => showPinTooltip('angel'));
-  dom.pinDevil.addEventListener('click', () => showPinTooltip('devil'));
+  dom.pinAngel.addEventListener('click', () => showPinTooltip('angel', 0));
+  dom.pinDevil.addEventListener('click', () => showPinTooltip('devil', 0));
   dom.btnCloseTooltip.addEventListener('click', hideTooltip);
 
   // 6. 추천 코디 적용 (Devil 피드백 교체)
   dom.btnApplyAdvice.addEventListener('click', applyStyleAdvice);
+  dom.btnAnalysisRetry.addEventListener('click', () => {
+    if (state.improvedOotdImage && dom.screenResult.classList.contains('active-screen') === false) {
+      reanalyzeImprovedImage();
+    } else {
+      startScanningSequence();
+    }
+  });
+  dom.btnReanalyzeImproved.addEventListener('click', reanalyzeImprovedImage);
+  dom.btnShowBefore.addEventListener('click', () => showImageVersion('before'));
+  dom.btnShowAfter.addEventListener('click', () => showImageVersion('after'));
 
   // 7. 다시하기 (Retry)
   dom.btnRetry.addEventListener('click', resetToUploadScreen);
@@ -271,6 +292,8 @@ function handleCustomFileUpload(e) {
   const reader = new FileReader();
   reader.onload = function(event) {
     state.currentOotdImage = event.target.result;
+    state.originalOotdImage = event.target.result;
+    state.improvedOotdImage = null;
 
     // 미리보기 렌더링
     dom.uploadPreviewImg.src = state.currentOotdImage;
@@ -333,6 +356,7 @@ function aiErrorMessage(error, fallbackSuffix = '') {
 
 function startScanningSequence() {
   dom.btnSubmitScan.disabled = true;
+  dom.analysisErrorPanel.classList.add('hidden');
   dom.loadingTitle.textContent = 'OOTD 스캐닝 중...';
   
   // 화면 전환 (Upload -> Loading)
@@ -388,7 +412,7 @@ function startScanningSequence() {
       apiResolved = true;
     })
     .catch(err => {
-      console.warn("AI analysis failed; using temporary local result.", err);
+      console.warn("AI analysis failed.", err);
       state.apiData = null;
       apiFailed = true;
       apiError = err;
@@ -404,10 +428,16 @@ function startScanningSequence() {
         clearInterval(checkCompletion);
         
         if (apiFailed) {
-          showToast(aiErrorMessage(apiError, ' 임시 결과를 보여드릴게요.'));
-        } else {
-          showToast("AI 분석 완료! 🎯");
+          dom.loadingTitle.textContent = '분석을 완료하지 못했어요';
+          dom.loadingStatusText.textContent = aiErrorMessage(apiError);
+          dom.loadingProgressFill.style.width = '20%';
+          dom.analysisErrorMessage.textContent = aiErrorMessage(apiError);
+          dom.analysisErrorPanel.classList.remove('hidden');
+          dom.btnSubmitScan.disabled = false;
+          return;
         }
+
+        showToast("AI 분석 완료! 🎯");
         
         dom.loadingStatusText.textContent = loadingTexts[loadingTexts.length - 1]; // "스캔 보고서 연성 완료!"
         dom.loadingProgressFill.style.width = "100%";
@@ -431,41 +461,24 @@ function startScanningSequence() {
 // 3단계: 결과창 연산
 function calculateFashionResults() {
   state.isPatched = false;
+  if (!state.apiData) throw new Error('Validated AI analysis data is required.');
 
-  if (state.apiData) {
-    // API 분석 결과 반영
-    state.score = state.apiData.score;
-    state.originalScore = state.apiData.score;
-    state.tier = state.apiData.tier;
-    state.bestMatch = state.apiData.bestMatch;
-    state.worstMatch = state.apiData.worstMatch;
-    state.musinsaQuery = state.apiData.musinsaQuery;
-    state.targetMusinsaItem = state.apiData.worstMatch ? state.apiData.worstMatch.recommendItem : "독일군 스니커즈";
-    
-    // 스탯 매핑 및 originalVal 기록
-    state.stats = Object.entries(state.apiData.stats || {}).map(([name, val]) => ({
-      name,
-      val: val,
-      originalVal: val
-    }));
-  } else {
-    // API 실패 혹은 없을 시 mock 데이터 폴백 복구
-    const seed = state.currentOotdImage ? state.currentOotdImage.length : 12345;
-    let baseScore = 4000 + (seed % 4800); // 4000 ~ 8800 점
-    baseScore += getRandomOffset(-200, 200);
-    baseScore = Math.max(1800, Math.min(9850, baseScore));
-
-    state.score = baseScore;
-    state.originalScore = baseScore;
-    state.tier = calculateTier(state.score);
-
-    state.bestMatch = { name: "전반적으로 핏의 실루엣 조합과 상체 라인 조화가 우수합니다! 😇", x: 60, y: 35 };
-    state.worstMatch = { name: "하반신의 슈즈 매치가 코디 전체의 매력을 해치고 있습니다. 베이직한 독일군 스니커즈로 변경을 강력 추천합니다. 😈", recommendItem: "독일군 스니커즈", x: 40, y: 75 };
-    state.musinsaQuery = "독일군 스니커즈";
-    state.targetMusinsaItem = "독일군 스니커즈";
-    
-    state.stats = []; // renderVibeStats에서 기존 Mock으로 재정의
-  }
+  state.score = state.apiData.score;
+  state.originalScore = state.apiData.score;
+  state.tier = state.apiData.tier;
+  state.bestMatches = state.apiData.bestMatches;
+  state.worstMatches = state.apiData.worstMatches;
+  state.bestMatch = state.bestMatches[0];
+  state.worstMatch = state.worstMatches[0];
+  state.musinsaQuery = state.apiData.musinsaQuery;
+  state.targetMusinsaItem = state.worstMatch.recommendItem;
+  state.stats = Object.entries(state.apiData.stats).map(([name, val]) => ({
+    name,
+    val,
+    originalVal: val,
+  }));
+  state.productRecommendations = [];
+  loadProductRecommendations();
 
   // 비주얼 이미지 및 배틀 레이아웃 세팅
   if (state.isBattleMode) {
@@ -526,32 +539,30 @@ function calculateFashionResults() {
 // 핀 마커 포지셔닝 및 코디 세팅
 function setupPins() {
   dom.feedbackTooltip.classList.add('hidden');
-  
-  // 임포트한 커스텀 이미지 위의 범용 OOTD 좌표 핀 세팅
-  let angelPos = { top: 35, left: 60 };
-  let devilPos = { top: 75, left: 40 };
+  document.querySelectorAll('.dynamic-fit-pin').forEach((pin) => pin.remove());
+  renderMatchPins('angel', state.bestMatches, dom.pinAngel, '😇', 'bg-white');
+  renderMatchPins('devil', state.worstMatches, dom.pinDevil, '😈', 'bg-error-container');
+}
 
-  if (state.bestMatch && typeof state.bestMatch.x === 'number' && typeof state.bestMatch.y === 'number') {
-    angelPos = { top: state.bestMatch.y, left: state.bestMatch.x };
-  }
-  if (state.worstMatch && typeof state.worstMatch.x === 'number' && typeof state.worstMatch.y === 'number') {
-    devilPos = { top: state.worstMatch.y, left: state.worstMatch.x };
-  }
-
-  // 핀 DOM 위치 적용
-  dom.pinAngel.style.top = `${angelPos.top}%`;
-  dom.pinAngel.style.left = `${angelPos.left}%`;
-  dom.pinDevil.style.top = `${devilPos.top}%`;
-  dom.pinDevil.style.left = `${devilPos.left}%`;
-
-  // 핀 복원 (Devil 핀 리셋)
-  dom.pinDevil.classList.remove('hidden');
-  dom.pinDevil.querySelector('span').textContent = "😈";
-  dom.pinDevil.className = "absolute bg-error-container border-2 border-black rounded-full p-1 shadow-[1px_1px_0px_0px_#000] hover:translate-x-px hover:translate-y-px hover:shadow-none active:translate-x-0.5 active:translate-y-0.5 active:shadow-none z-20 cursor-pointer text-lg transition-all flex items-center justify-center w-9 h-9";
+function renderMatchPins(type, matches, basePin, emoji, backgroundClass) {
+  matches.forEach((match, index) => {
+    const pin = index === 0 ? basePin : basePin.cloneNode(true);
+    pin.className = `absolute ${backgroundClass} border-2 border-black rounded-full shadow-[1px_1px_0px_0px_#000] z-20 cursor-pointer text-sm transition-all flex items-center justify-center w-7 h-7 ${index ? 'dynamic-fit-pin' : ''}`;
+    pin.style.top = `${match.y}%`;
+    pin.style.left = `${match.x}%`;
+    pin.dataset.pinType = type;
+    pin.querySelector('span').textContent = emoji;
+    pin.classList.remove('hidden');
+    if (index > 0) {
+      pin.removeAttribute('id');
+      pin.addEventListener('click', () => showPinTooltip(type, index));
+      basePin.parentElement.appendChild(pin);
+    }
+  });
 }
 
 // 핀 상세 정보 툴팁 노출
-function showPinTooltip(type) {
+function showPinTooltip(type, index = 0) {
   dom.feedbackTooltip.classList.remove('hidden');
   playSound('select');
 
@@ -562,7 +573,8 @@ function showPinTooltip(type) {
 
     dom.tooltipTitle.textContent = "😇 BEST MATCH";
     dom.tooltipTitle.className = "font-headline font-black text-xs uppercase px-2 py-0.5 border-[2px] border-black bg-secondary text-black";
-    dom.tooltipContent.textContent = state.bestMatch ? state.bestMatch.name : "전반적으로 핏의 실루엣 조합과 상체 라인 조화가 우수합니다! 😇";
+    dom.tooltipContent.textContent = state.bestMatches[index].name;
+    dom.recommendationList.classList.add('hidden');
     
     // Angel은 쇼핑몰 추천 및 코디적용 숨김
     dom.linkShopping.classList.add('hidden');
@@ -575,13 +587,15 @@ function showPinTooltip(type) {
     dom.tooltipTitle.textContent = "😈 WORST MATCH";
     dom.tooltipTitle.className = "font-headline font-black text-xs uppercase px-2 py-0.5 border-[2px] border-black bg-error-container text-black";
     
-    let comment = state.worstMatch ? state.worstMatch.name : "하반신의 슈즈 매치가 코디 전체의 매력을 해치고 있습니다. 베이직한 독일군 스니커즈로 변경을 강력 추천합니다. 😈";
-    let query = state.musinsaQuery ? encodeURIComponent(state.musinsaQuery) : "독일군+스니커즈";
+    const selectedMatch = state.worstMatches[index];
+    let comment = selectedMatch.name;
+    let query = encodeURIComponent(selectedMatch.recommendItem);
 
     dom.tooltipContent.textContent = comment;
-    state.targetMusinsaItem = state.worstMatch ? state.worstMatch.recommendItem : "독일군 스니커즈";
+    state.targetMusinsaItem = selectedMatch.recommendItem;
     state.targetMusinsaUrl = `https://www.musinsa.com/search/goods?keyword=${query}`;
     dom.linkShopping.href = "#";
+    renderRecommendationCards();
     
     // Devil 쇼핑몰 이동 및 추천 코디 버튼 활성화
     dom.linkShopping.classList.remove('hidden');
@@ -606,6 +620,71 @@ function hideTooltip() {
   // 모든 핀 활성 상태 하이라이트 제거
   dom.pinAngel.classList.remove('ring-[5px]', 'ring-black', 'scale-110');
   dom.pinDevil.classList.remove('ring-[5px]', 'ring-black', 'scale-110');
+}
+
+function renderRecommendationCards() {
+  dom.recommendationList.innerHTML = '';
+  dom.recommendationList.classList.remove('hidden');
+  dom.recommendationList.classList.add('flex');
+
+  state.worstMatches.slice(0, 3).forEach((match, index) => {
+    const product = state.productRecommendations[index];
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = `w-full flex items-stretch gap-3 border-[2px] border-black p-2 text-left ${index === 0 ? 'bg-secondary shadow-[2px_2px_0_#000]' : 'bg-white'}`;
+    const tags = match.reasonTags.map((tag) => `<span class="text-[9px] font-black bg-cream border border-black px-1.5 py-0.5">#${escapeHtml(tag)}</span>`).join('');
+    const visual = product?.image
+      ? `<img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.title)}" class="w-16 h-16 shrink-0 border-[2px] border-black bg-white object-contain" referrerpolicy="no-referrer">`
+      : `<div class="w-16 h-16 shrink-0 border-[2px] border-black bg-cover bg-no-repeat" style="background-image:url('${state.originalOotdImage}');background-position:${match.x}% ${match.y}%"></div>`;
+    const productMeta = product
+      ? `<div class="text-[9px] font-bold mt-1 truncate">${escapeHtml(product.mallName)}${product.price ? ` · ${product.price.toLocaleString()}원` : ''}</div>`
+      : '<div class="text-[9px] font-bold mt-1 opacity-60">유사 상품 검색 준비 중</div>';
+    card.innerHTML = `
+      ${visual}
+      <div class="min-w-0 flex-1">
+        <div class="text-[9px] font-black mb-1">${index === 0 ? 'TOP PICK' : `OPTION ${index + 1}`}</div>
+        <div class="text-xs font-black">${escapeHtml(product?.title || match.recommendItem)}</div>
+        ${productMeta}
+        <div class="flex flex-wrap gap-1">${tags}</div>
+      </div>`;
+    card.addEventListener('click', () => {
+      state.targetMusinsaItem = match.recommendItem;
+      state.worstMatch = match;
+      state.targetMusinsaUrl = product?.link || `https://www.musinsa.com/search/goods?keyword=${encodeURIComponent(match.recommendItem)}`;
+      dom.tooltipContent.textContent = match.name;
+      renderRecommendationCards();
+    });
+    dom.recommendationList.appendChild(card);
+  });
+}
+
+async function loadProductRecommendations() {
+  const queries = state.worstMatches?.slice(0, 3).map((match) => match.recommendItem) || [];
+  if (!queries.length) return;
+  try {
+    const response = await fetch('/api/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ queries }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !Array.isArray(payload.products)) return;
+    state.productRecommendations = payload.products;
+    const topProduct = state.productRecommendations[0];
+    if (topProduct?.link) {
+      state.targetMusinsaUrl = topProduct.link;
+      state.targetMusinsaItem = topProduct.title || queries[0];
+    }
+    if (!dom.feedbackTooltip.classList.contains('hidden')) renderRecommendationCards();
+  } catch (error) {
+    console.warn('Product image lookup unavailable; using outfit crop fallback.', error);
+  }
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>'"]/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
+  })[character]);
 }
 
 function startStyleEditLoading(recommendItemName) {
@@ -680,6 +759,8 @@ async function applyStyleAdvice() {
     const resultImage = state.isBattleMode ? dom.resultOotdImgChallenger : dom.resultOotdImg;
     resultImage.src = payload.image;
     await resultImage.decode();
+    state.originalOotdImage ||= state.currentOotdImage;
+    state.improvedOotdImage = payload.image;
     state.currentOotdImage = payload.image;
     await finishLoading(true);
   } catch (error) {
@@ -692,49 +773,53 @@ async function applyStyleAdvice() {
   state.isPatched = true;
   dom.btnApplyAdvice.disabled = false;
   hideTooltip();
-
-  // 1. 보너스 스코어 획득 플로팅 연출
-  dom.bonusScoreBadge.classList.remove('hidden');
   playSound('upgrade');
+  document.querySelectorAll('[data-pin-type]').forEach((pin) => pin.classList.add('hidden'));
+  dom.resultTopOverlayTag.textContent = '개선 이미지';
+  dom.imageVersionToggle.classList.remove('hidden');
+  dom.reanalyzeImprovedPanel.classList.remove('hidden');
+  showImageVersion('after');
+  showToast('코디 적용 완료! 결과가 자연스러운지 확인한 뒤 다시 분석해 주세요. ✨');
+}
 
-  // 2. 핀 마커 숨기기 (코디 보완 패치 적용 시 중복 마커 클러터 방지)
-  dom.pinDevil.classList.add('hidden');
-  
-  // 3. 개선 결과 텍스트와 점수 갱신
-  // 4. 점수 카운트업 실행 (+1,500점)
-  let currentVal = state.score;
-  const targetVal = Math.min(10000, state.score + 1500);
-  state.score = targetVal;
+function showImageVersion(version) {
+  if (!state.improvedOotdImage) return;
+  const showBefore = version === 'before';
+  dom.resultOotdImg.src = showBefore ? state.originalOotdImage : state.improvedOotdImage;
+  dom.btnShowBefore.className = `px-2 py-1 text-[10px] font-black ${showBefore ? 'bg-black text-white' : 'bg-white text-black'}`;
+  dom.btnShowAfter.className = `px-2 py-1 text-[10px] font-black ${showBefore ? 'bg-white text-black' : 'bg-secondary text-black'}`;
+  dom.resultTopOverlayTag.textContent = showBefore ? '원본' : '개선 이미지';
+}
 
-  const duration = 1000;
-  const stepTime = 16;
-  const increment = (targetVal - currentVal) / (duration / stepTime);
+async function reanalyzeImprovedImage() {
+  if (!state.improvedOotdImage) return;
+  state.currentOotdImage = state.improvedOotdImage;
+  dom.btnReanalyzeImproved.disabled = true;
+  dom.screenResult.classList.remove('active-screen');
+  dom.screenLoading.classList.add('active-screen');
+  dom.analysisErrorPanel.classList.add('hidden');
+  dom.loadingTitle.textContent = '개선 이미지 재분석 중...';
+  dom.loadingStatusText.textContent = '새 코디를 처음부터 다시 채점하고 있어요. 🔍';
+  dom.loadingProgressFill.style.width = '35%';
 
-  const scoreTimer = setInterval(() => {
-    currentVal += increment;
-    if (currentVal >= targetVal) {
-      dom.resultScoreNum.textContent = targetVal.toLocaleString();
-      clearInterval(scoreTimer);
-      
-      // 등급 및 최종 대시보드 스탯 갱신
-      state.tier = calculateTier(targetVal);
-      dom.resultTierName.textContent = state.tier;
-      dom.resultTopOverlayTag.textContent = "UPGRADE 완료";
-      
-      // 로스트 텍스트 격려 멘트로 변경
-      dom.resultRoastText.textContent = `🎉 훌륭합니다! 워스트 부위를 트렌디한 ${recommendItemName}(으)로 코디 대체하자마자 착장 밸런스가 한층 안정되었습니다. 안구 정화 완료! 😎`;
-      
-      // 스탯 갱신
-      renderVibeStats();
-      showToast("코디 교체 완료! +1,500점 패션력 상승! ⚡");
-    } else {
-      dom.resultScoreNum.textContent = Math.floor(currentVal).toLocaleString();
-    }
-  }, stepTime);
-
-  setTimeout(() => {
-    dom.bonusScoreBadge.classList.add('hidden');
-  }, 2200);
+  try {
+    state.apiData = await callAnalyzeAPI(state.improvedOotdImage, state.selectedTpo);
+    dom.loadingProgressFill.style.width = '100%';
+    calculateFashionResults();
+    dom.imageVersionToggle.classList.remove('hidden');
+    dom.reanalyzeImprovedPanel.classList.add('hidden');
+    showImageVersion('after');
+    dom.screenLoading.classList.remove('active-screen');
+    dom.screenResult.classList.add('active-screen');
+    showToast('개선 이미지 재분석 완료! 새 점수를 확인해 보세요. 🎯');
+  } catch (error) {
+    dom.loadingTitle.textContent = '재분석을 완료하지 못했어요';
+    dom.loadingStatusText.textContent = aiErrorMessage(error);
+    dom.analysisErrorMessage.textContent = aiErrorMessage(error);
+    dom.analysisErrorPanel.classList.remove('hidden');
+  } finally {
+    dom.btnReanalyzeImproved.disabled = false;
+  }
 }
 
 async function prepareImageForStyleEdit(dataUrl) {
@@ -1014,22 +1099,23 @@ function getRoastComment(tpo, score, isPatched) {
   return `🚨 ${currentRoast.iron}`;
 }
 
-// 로컬 난수 보정기
-function getRandomOffset(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
 // 다시 시작하기 (Retry)
 function resetToUploadScreen() {
   state.currentOotdImage = null;
+  state.originalOotdImage = null;
+  state.improvedOotdImage = null;
   state.score = 0;
   state.isPatched = false;
   state.apiData = null; // API 데이터 리셋
+  state.productRecommendations = [];
+  dom.imageVersionToggle.classList.add('hidden');
+  dom.reanalyzeImprovedPanel.classList.add('hidden');
+  dom.analysisErrorPanel.classList.add('hidden');
   
   // 핀 복원 및 클릭 리스너 청소
   dom.pinDevil.classList.remove('hidden');
   dom.pinDevil.querySelector('span').textContent = "😈";
-  dom.pinDevil.className = "absolute bg-error-container border-2 border-black rounded-full p-1 shadow-[1px_1px_0px_0px_#000] hover:translate-x-px hover:translate-y-px hover:shadow-none active:translate-x-0.5 active:translate-y-0.5 active:shadow-none z-20 cursor-pointer text-lg transition-all flex items-center justify-center w-9 h-9";
+  dom.pinDevil.className = "absolute bg-error-container border-2 border-black rounded-full shadow-[1px_1px_0px_0px_#000] z-20 cursor-pointer text-sm transition-all flex items-center justify-center w-7 h-7";
   
   // 배틀 상태 해제 및 URL 클리닝
   if (state.isBattleMode) {
