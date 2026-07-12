@@ -1,16 +1,10 @@
-# Dependency directories
 node_modules/
-
-# Build outputs
 dist/
-
-# Local env files
-.env
-.env.local
-
-# OS files
+.wrangler/
+.dev.vars
+.env*
+!.env.example
+*.log
 .DS_Store
 Thumbs.db
-
-# Archives
 fitcheck.zip

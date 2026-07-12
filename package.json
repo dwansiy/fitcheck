@@ -1,14 +1,24 @@
 {
-  "name": "fitbattle",
+  "name": "fitcheck",
   "version": "1.0.0",
-  "description": "FitBattle - OOTD Combat Power Arena",
-  "main": "index.html",
+  "private": true,
+  "type": "module",
+  "description": "AI-powered OOTD feedback for different occasions",
   "scripts": {
-    "dev": "npm run dev --prefix fitcheck",
-    "build": "npm install --prefix fitcheck && npm run build --prefix fitcheck",
-    "preview": "vite preview"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "npm run build"
   },
   "devDependencies": {
+    "@tailwindcss/container-queries": "^0.1.1",
+    "@tailwindcss/forms": "^0.5.11",
+    "autoprefixer": "^10.5.2",
+    "postcss": "^8.5.16",
+    "tailwindcss": "^3.4.17",
     "vite": "^6.0.0"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
