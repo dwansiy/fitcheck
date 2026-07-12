@@ -51,14 +51,13 @@ const dom = {
   btnSubmitScan: document.getElementById('btn-submit-scan'),
   
   // 로딩 화면
+  loadingTitle: document.getElementById('loading-title'),
   loadingStatusText: document.getElementById('loading-status-text'),
   loadingProgressFill: document.getElementById('loading-progress-fill'),
   
   // 결과 화면
   resultOotdImg: document.getElementById('result-ootd-img'),
   resultTopOverlayTag: document.getElementById('result-top-overlay-tag'),
-  stylePatchedBadge: document.getElementById('style-patched-badge'),
-  virtualStickerOverlay: document.getElementById('virtual-sticker-overlay'),
   pinAngel: document.getElementById('pin-angel'),
   pinDevil: document.getElementById('pin-devil'),
   feedbackTooltip: document.getElementById('feedback-tooltip'),
@@ -428,6 +427,7 @@ ${tpo}
 // 2단계: 로딩 스캔 진행 시뮬레이션
 function startScanningSequence() {
   dom.btnSubmitScan.disabled = true;
+  dom.loadingTitle.textContent = 'OOTD 스캐닝 중...';
   
   // 화면 전환 (Upload -> Loading)
   dom.screenUpload.classList.remove('active-screen');
@@ -523,8 +523,6 @@ function startScanningSequence() {
 // 3단계: 결과창 연산
 function calculateFashionResults() {
   state.isPatched = false;
-  dom.stylePatchedBadge.classList.add('hidden');
-  dom.virtualStickerOverlay.classList.add('hidden');
 
   if (state.apiData) {
     // API 분석 결과 반영
@@ -641,7 +639,7 @@ function setupPins() {
   // 핀 복원 (Devil 핀 리셋)
   dom.pinDevil.classList.remove('hidden');
   dom.pinDevil.querySelector('span').textContent = "😈";
-  dom.pinDevil.className = "absolute bg-error-container border-[3px] border-black rounded-full p-2.5 neo-shadow hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none active:translate-x-[4px] active:translate-y-[4px] active:shadow-none z-20 cursor-pointer text-2xl transition-all flex items-center justify-center w-12 h-12 group gap-1";
+  dom.pinDevil.className = "absolute bg-error-container border-2 border-black rounded-full p-1 shadow-[2px_2px_0px_0px_#000] hover:translate-x-px hover:translate-y-px hover:shadow-none active:translate-x-0.5 active:translate-y-0.5 active:shadow-none z-20 cursor-pointer text-lg transition-all flex items-center justify-center w-9 h-9";
 }
 
 // 핀 상세 정보 툴팁 노출
@@ -702,12 +700,53 @@ function hideTooltip() {
   dom.pinDevil.classList.remove('ring-[5px]', 'ring-black', 'scale-110');
 }
 
+function startStyleEditLoading(recommendItemName) {
+  const loadingTexts = [
+    `${recommendItemName} 픽셀 원단 재단 중...`,
+    '기존 포즈는 얼음! 옷만 몰래 갈아입히는 중...',
+    'AI 재봉틀 초고속 박음질 가동 중...',
+    '얼굴·배경 건드리면 감점이라고 교육 중...',
+    '새 코디의 어색한 주름 다림질 중...',
+    '거울 앞 최종 핏 체크 중... 잠시만요!'
+  ];
+  const headerWasHidden = dom.appHeader.classList.contains('hidden');
+  let step = 0;
+
+  hideTooltip();
+  dom.screenResult.classList.remove('active-screen');
+  dom.screenLoading.classList.add('active-screen');
+  dom.appHeader.classList.add('hidden');
+  dom.loadingTitle.textContent = 'AI 스타일 리믹스 중...';
+  dom.loadingStatusText.textContent = loadingTexts[0];
+  dom.loadingProgressFill.style.width = '12%';
+
+  const interval = setInterval(() => {
+    step = Math.min(step + 1, loadingTexts.length - 1);
+    dom.loadingStatusText.textContent = loadingTexts[step];
+    dom.loadingProgressFill.style.width = `${Math.min(92, 12 + step * 16)}%`;
+    playSound('beep');
+  }, 900);
+
+  return async (succeeded) => {
+    clearInterval(interval);
+    dom.loadingStatusText.textContent = succeeded
+      ? '새 옷 착붙 완료! 런웨이로 복귀합니다. ✨'
+      : '재봉틀 실이 꼬였습니다. 원래 코디로 복귀합니다. 🧵';
+    dom.loadingProgressFill.style.width = succeeded ? '100%' : '25%';
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    dom.screenLoading.classList.remove('active-screen');
+    dom.screenResult.classList.add('active-screen');
+    if (!headerWasHidden) dom.appHeader.classList.remove('hidden');
+  };
+}
+
 // 추천 코디 적용 (실시간 Rescoring 및 가상 대체)
 async function applyStyleAdvice() {
   if (state.isPatched) return;
 
   dom.btnApplyAdvice.disabled = true;
-  showToast('AI가 추천 아이템을 자연스럽게 적용하고 있습니다... ✨');
+  const recommendItemName = state.targetMusinsaItem || "독일군 스니커즈";
+  const finishLoading = startStyleEditLoading(recommendItemName);
 
   try {
     const preparedImage = await prepareImageForStyleEdit(state.currentOotdImage);
@@ -729,7 +768,9 @@ async function applyStyleAdvice() {
     resultImage.src = payload.image;
     await resultImage.decode();
     state.currentOotdImage = payload.image;
+    await finishLoading(true);
   } catch (error) {
+    await finishLoading(false);
     showToast(error.message || '이미지 개선에 실패했습니다. 잠시 후 다시 시도해 주세요.');
     dom.btnApplyAdvice.disabled = false;
     return;
@@ -741,39 +782,12 @@ async function applyStyleAdvice() {
 
   // 1. 보너스 스코어 획득 플로팅 연출
   dom.bonusScoreBadge.classList.remove('hidden');
-  dom.stylePatchedBadge.classList.remove('hidden');
   playSound('upgrade');
 
   // 2. 핀 마커 숨기기 (코디 보완 패치 적용 시 중복 마커 클러터 방지)
   dom.pinDevil.classList.add('hidden');
   
-  // 3. 사진 위에 가상 장착 스티커 박스 붙이기
-  const recommendItemName = state.targetMusinsaItem || "독일군 스니커즈";
-  let pos = { top: 72, left: 33 };
-  if (state.worstMatch && typeof state.worstMatch.x === 'number' && typeof state.worstMatch.y === 'number') {
-    pos.top = Math.min(90, Math.max(10, state.worstMatch.y - 3));
-    pos.left = Math.min(90, Math.max(10, state.worstMatch.x - 7));
-  }
-
-  // 스티커 위치 잡고 보이기 (Neo-Brutalist 스티커 스타일)
-  dom.virtualStickerOverlay.style.top = `${pos.top}%`;
-  dom.virtualStickerOverlay.style.left = `${pos.left}%`;
-  dom.virtualStickerOverlay.innerHTML = `
-    <span class="absolute -top-3 -left-3 bg-white border-[2px] border-black text-[9px] font-headline font-black px-1 py-0.5 shadow-[1px_1px_0px_rgba(0,0,0,1)] uppercase text-black">PATCHED</span>
-    <div class="bg-[#e2f4eb] border-[3px] border-black px-2.5 py-1.5 shadow-[3px_3px_0px_0px_#000000] rotate-[-5deg] font-bold text-xs flex items-center gap-1.5 text-black">
-      <span>👟</span>
-      <span>${recommendItemName}</span>
-    </div>
-  `;
-  dom.virtualStickerOverlay.classList.remove('hidden');
-
-  // 클릭 인터랙션 추가 (구원된 핀 대신 스티커가 세부설명 응답)
-  dom.virtualStickerOverlay.style.cursor = "pointer";
-  dom.virtualStickerOverlay.onclick = () => {
-    showToast(`🎉 코디 개선 완료! ${recommendItemName} 가상 대체 장착 (+1,500점)`);
-    playSound('select');
-  };
-
+  // 3. 개선 결과 텍스트와 점수 갱신
   // 4. 점수 카운트업 실행 (+1,500점)
   let currentVal = state.score;
   const targetVal = Math.min(10000, state.score + 1500);
@@ -1102,8 +1116,7 @@ function resetToUploadScreen() {
   // 핀 복원 및 클릭 리스너 청소
   dom.pinDevil.classList.remove('hidden');
   dom.pinDevil.querySelector('span').textContent = "😈";
-  dom.pinDevil.className = "absolute bg-error-container border-[3px] border-black rounded-full p-2.5 neo-shadow hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none active:translate-x-[4px] active:translate-y-[4px] active:shadow-none z-20 cursor-pointer text-2xl transition-all flex items-center justify-center w-12 h-12 group gap-1";
-  dom.virtualStickerOverlay.onclick = null;
+  dom.pinDevil.className = "absolute bg-error-container border-2 border-black rounded-full p-1 shadow-[2px_2px_0px_0px_#000] hover:translate-x-px hover:translate-y-px hover:shadow-none active:translate-x-0.5 active:translate-y-0.5 active:shadow-none z-20 cursor-pointer text-lg transition-all flex items-center justify-center w-9 h-9";
   
   // 배틀 상태 해제 및 URL 클리닝
   if (state.isBattleMode) {
@@ -1348,21 +1361,6 @@ function exportInstagramStory() {
     ctx.lineWidth = 10;
     ctx.strokeStyle = '#000000';
     ctx.strokeRect(imgX, imgY, imgWidth, imgHeight);
-  }
-
-  // 4-5. 만약 코디 개선 패치가 적용되었다면, 캔버스에도 귀여운 "UPGRADED" 스티커 도장 합성 (일반모드 한정)
-  if (!state.isBattleMode && state.isPatched) {
-    ctx.fillStyle = '#e2f4eb'; // Mint
-    ctx.fillRect(250, 840, 240, 60);
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = '#000000';
-    ctx.strokeRect(250, 840, 240, 60);
-    
-    ctx.fillStyle = '#000000';
-    ctx.font = 'bold 24px Lexend, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('⚡ STYLE UPGRADED', 370, 870);
   }
 
   // 5. 점수 및 등급 텍스트 합성
