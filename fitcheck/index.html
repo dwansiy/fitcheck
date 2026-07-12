@@ -69,7 +69,9 @@
         <!-- 업로드 대기 상태 돔 -->
         <div id="upload-placeholder" class="flex flex-col items-center justify-center">
           <div class="w-20 h-20 rounded-full bg-primary border-[3px] border-black flex items-center justify-center mb-5 group-hover:scale-110 transition-transform neo-shadow">
-            <span class="material-symbols-outlined text-[36px] text-black" style="font-variation-settings: 'FILL' 1;">add_a_photo</span>
+            <svg aria-hidden="true" class="w-9 h-9 text-black" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 3 7.2 5H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.2L15 3H9Zm3 14.5A5.5 5.5 0 1 1 12 6.5a5.5 5.5 0 0 1 0 11Zm0-2A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7ZM19 9h-2V7h2v2Z"/>
+            </svg>
           </div>
           <h2 class="font-headline text-3xl font-black text-black uppercase text-center mb-2 leading-none">OOTD<br/>업로드</h2>
           <p class="text-sm text-on-surface-variant text-center px-4 font-medium opacity-80">탭하여 사진을 올리거나 촬영하세요</p>
@@ -112,6 +114,9 @@
       <button id="btn-submit-scan" class="w-full mt-4 bg-tertiary border-[3px] border-black neo-shadow px-6 py-6 transform rotate-[1deg] hover:bg-white active:translate-x-1 active:translate-y-1 active:shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none" disabled>
         <span class="font-headline text-2xl font-black uppercase text-black">패션력 측정하기</span>
       </button>
+      <p class="text-[11px] leading-relaxed text-black/70 text-center px-2">
+        측정 및 이미지 개선을 실행하면 선택한 사진이 분석을 위해 Google Gemini 또는 Cloudflare Workers AI로 전송됩니다. 사진은 결과 생성 목적으로만 처리되며 FitCheck 서버에 별도로 저장하지 않습니다.
+      </p>
     </section>
 
 
@@ -196,12 +201,12 @@
           </div>
 
           <!-- Angel Marker (😇) -->
-          <div id="pin-angel" class="absolute bg-white border-2 border-black rounded-full p-1 shadow-[2px_2px_0px_0px_#000] hover:translate-x-px hover:translate-y-px hover:shadow-none active:translate-x-0.5 active:translate-y-0.5 active:shadow-none z-20 cursor-pointer text-lg transition-all flex items-center justify-center w-9 h-9">
+          <div id="pin-angel" class="absolute bg-white border-2 border-black rounded-full p-1 shadow-[1px_1px_0px_0px_#000] hover:translate-x-px hover:translate-y-px hover:shadow-none active:translate-x-0.5 active:translate-y-0.5 active:shadow-none z-20 cursor-pointer text-lg transition-all flex items-center justify-center w-9 h-9">
             <span>😇</span>
           </div>
 
           <!-- Devil Marker (😈) -->
-          <div id="pin-devil" class="absolute bg-error-container border-2 border-black rounded-full p-1 shadow-[2px_2px_0px_0px_#000] hover:translate-x-px hover:translate-y-px hover:shadow-none active:translate-x-0.5 active:translate-y-0.5 active:shadow-none z-20 cursor-pointer text-lg transition-all flex items-center justify-center w-9 h-9">
+          <div id="pin-devil" class="absolute bg-error-container border-2 border-black rounded-full p-1 shadow-[1px_1px_0px_0px_#000] hover:translate-x-px hover:translate-y-px hover:shadow-none active:translate-x-0.5 active:translate-y-0.5 active:shadow-none z-20 cursor-pointer text-lg transition-all flex items-center justify-center w-9 h-9">
             <span>😈</span>
           </div>
 

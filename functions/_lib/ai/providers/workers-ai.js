@@ -1,4 +1,4 @@
-import { AiConfigurationError, AiProviderError } from './gemini.js';
+import { AI_ERROR_CODES, AiConfigurationError, AiProviderError } from '../errors.js';
 
 export async function runWorkersAiImageEdit({ modelId, env, input }) {
   if (!env.AI) throw new AiConfigurationError("Workers AI binding 'AI' is not configured.");
@@ -19,6 +19,14 @@ export async function runWorkersAiImageEdit({ modelId, env, input }) {
     });
   } catch (error) {
     console.error('Workers AI image edit failed', error instanceof Error ? error.message : error);
-    throw new AiProviderError('Image editing failed.');
+    const details = `${error?.message || ''} ${error?.cause?.message || ''}`;
+    const quotaExceeded = error?.status === 429 || /3036|quota|allocation|rate.?limit/i.test(details);
+    const safetyBlocked = /safety|moderation|unsafe|content.?policy/i.test(details);
+    const code = quotaExceeded
+      ? AI_ERROR_CODES.QUOTA_EXCEEDED
+      : safetyBlocked
+        ? AI_ERROR_CODES.SAFETY_BLOCKED
+        : AI_ERROR_CODES.TEMPORARY_UNAVAILABLE;
+    throw new AiProviderError('Image editing failed.', quotaExceeded ? 429 : safetyBlocked ? 422 : 503, code);
   }
 }

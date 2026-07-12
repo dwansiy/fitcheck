@@ -1,6 +1,7 @@
 import { AI_FEATURES, resolveAiModel } from '../_lib/ai/models.js';
 import { runAiModel } from '../_lib/ai/run.js';
 import { base64ToBlob, json, parseDataUrl } from '../_lib/http.js';
+import { toPublicAiError } from '../_lib/ai/errors.js';
 
 const MAX_TEXT_LENGTH = 500;
 
@@ -30,12 +31,8 @@ export async function onRequestPost({ request, env }) {
     return json({ image: `data:image/jpeg;base64,${result.image}` });
   } catch (error) {
     console.error('Style edit handler failed', error instanceof Error ? error.message : error);
-    const missingBinding = error?.constructor?.name === 'AiConfigurationError';
-    return json({
-      error: missingBinding
-        ? '이미지 편집 AI가 아직 설정되지 않았습니다.'
-        : '이미지 개선에 실패했습니다. 잠시 후 다시 시도해 주세요.',
-    }, missingBinding ? 503 : 500);
+    const publicError = toPublicAiError(error);
+    return json({ error: publicError.message, code: publicError.code }, publicError.status);
   }
 }
 

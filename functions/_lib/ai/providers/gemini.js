@@ -1,3 +1,5 @@
+import { AI_ERROR_CODES, AiConfigurationError, AiProviderError } from '../errors.js';
+
 export async function runGemini({ modelId, env, input }) {
   if (!env.GEMINI_API_KEY) throw new AiConfigurationError('GEMINI_API_KEY is not configured.');
 
@@ -15,16 +17,10 @@ export async function runGemini({ modelId, env, input }) {
 
   if (!response.ok) {
     console.error('Gemini request failed', response.status, await response.text());
-    throw new AiProviderError('Gemini analysis failed.', response.status);
+    const code = response.status === 429
+      ? AI_ERROR_CODES.QUOTA_EXCEEDED
+      : AI_ERROR_CODES.TEMPORARY_UNAVAILABLE;
+    throw new AiProviderError('Gemini analysis failed.', response.status, code);
   }
   return response.json();
-}
-
-export class AiConfigurationError extends Error {}
-
-export class AiProviderError extends Error {
-  constructor(message, status = 502) {
-    super(message);
-    this.status = status;
-  }
 }

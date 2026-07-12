@@ -1,5 +1,7 @@
 import { AI_FEATURES, resolveAiModel } from '../_lib/ai/models.js';
 import { runAiModel } from '../_lib/ai/run.js';
+import { OUTFIT_RESULT_SCHEMA, parseOutfitResult } from '../_lib/ai/outfit-result.js';
+import { toPublicAiError } from '../_lib/ai/errors.js';
 import { json as jsonResponse, parseDataUrl } from '../_lib/http.js';
 
 const ALLOWED_TPOS = new Set(['일상', '데이트', '출근', '운동', '하객']);
@@ -95,18 +97,20 @@ ${tpo}
         }
       ],
       generationConfig: {
-        responseMimeType: "application/json"
+        responseFormat: {
+          text: {
+            mimeType: 'application/json',
+            schema: OUTFIT_RESULT_SCHEMA,
+          },
+        },
       }
     };
 
-    const json = await runAiModel(model, env, requestBody);
-    const text = json.candidates[0].content.parts[0].text;
-
-    return new Response(text, {
-      headers: { "Content-Type": "application/json" }
-    });
+    const response = await runAiModel(model, env, requestBody);
+    return jsonResponse(parseOutfitResult(response));
   } catch (error) {
     console.error('Analyze handler failed', error instanceof Error ? error.message : error);
-    return jsonResponse({ error: '패션 분석 요청을 처리하지 못했습니다.' }, 500);
+    const publicError = toPublicAiError(error);
+    return jsonResponse({ error: publicError.message, code: publicError.code }, publicError.status);
   }
 }
