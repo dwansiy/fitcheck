@@ -98,10 +98,6 @@
       <!-- 파일 인풋 요소는 업로드 영역 밖으로 이동하여 무한클릭 루프 및 다이얼로그 차단 현상 방지 -->
       <input type="file" id="image-file-input" accept="image/jpeg,image/png,image/webp" class="hidden">
 
-      <button id="btn-try-sample" class="w-full bg-secondary border-[3px] border-black py-3 font-headline text-sm font-black neo-shadow hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all">
-        샘플로 10초 체험 ⚡
-      </button>
-
       <!-- TPO 상황선택 칩 -->
       <div class="w-full flex flex-col gap-3">
         <h3 class="font-headline text-lg font-black uppercase pl-1">상황(TPO) 선택:</h3>
@@ -131,6 +127,16 @@
       <p class="text-[11px] leading-relaxed text-black/70 text-center px-2">
         측정 및 이미지 개선을 실행하면 선택한 사진이 분석을 위해 Google Gemini 또는 Cloudflare Workers AI로 전송됩니다. 사진은 결과 생성 목적으로만 처리되며 FitCheck 서버에 별도로 저장하지 않습니다.
       </p>
+
+      <div id="sample-tip-card" class="w-full bg-cream border-[2px] border-black p-3 flex items-center justify-between gap-3 rotate-[-1deg]">
+        <div class="min-w-0">
+          <p class="text-[9px] font-black uppercase tracking-wide">💡 처음이라면?</p>
+          <p id="sample-tip-text" class="text-[10px] font-bold text-on-surface-variant mt-0.5">사진을 고르기 전에 결과 화면을 가볍게 구경해 보세요.</p>
+        </div>
+        <button id="btn-try-sample" class="shrink-0 bg-white border-[2px] border-black px-3 py-2 font-headline text-[10px] font-black shadow-[2px_2px_0_#000] hover:translate-x-px hover:translate-y-px hover:shadow-none transition-all disabled:bg-black/5 disabled:text-black/40 disabled:shadow-none disabled:cursor-not-allowed" type="button">
+          샘플 체험 ⚡
+        </button>
+      </div>
 
       <div id="recent-results-card" class="hidden w-full bg-white border-[3px] border-black p-4 neo-shadow">
         <div class="flex items-center justify-between gap-2 mb-3">

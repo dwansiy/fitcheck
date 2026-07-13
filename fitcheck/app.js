@@ -62,6 +62,8 @@ const dom = {
   tpoChips: document.querySelectorAll('.tpo-chip'),
   btnSubmitScan: document.getElementById('btn-submit-scan'),
   btnTrySample: document.getElementById('btn-try-sample'),
+  sampleTipCard: document.getElementById('sample-tip-card'),
+  sampleTipText: document.getElementById('sample-tip-text'),
   recentResultsCard: document.getElementById('recent-results-card'),
   recentResultsList: document.getElementById('recent-results-list'),
   
@@ -199,7 +201,7 @@ function checkBattleQueryParameters() {
       const spanEl = dom.btnSubmitScan.querySelector('span');
       if (spanEl) spanEl.textContent = "배틀 측정 시작하기 🥊";
     }
-    dom.btnTrySample.classList.add('hidden');
+    dom.sampleTipCard.classList.add('hidden');
   }
 }
 
@@ -330,6 +332,10 @@ async function handleCustomFileUpload(e) {
     return;
   }
 
+  dom.btnTrySample.disabled = true;
+  dom.btnTrySample.textContent = '사진 확인 중...';
+  dom.sampleTipText.textContent = '선택한 OOTD가 분석 가능한 사진인지 확인하고 있어요.';
+
   try {
     const optimizedImage = await optimizeImageBlob(file);
     setUploadedImage(optimizedImage);
@@ -342,9 +348,10 @@ async function handleCustomFileUpload(e) {
 }
 
 async function trySampleExperience() {
+  if (state.currentOotdImage) return;
   dom.btnTrySample.disabled = true;
   const originalLabel = dom.btnTrySample.textContent;
-  dom.btnTrySample.textContent = '샘플 코디 불러오는 중... ⏳';
+  dom.btnTrySample.textContent = '불러오는 중... ⏳';
   try {
     const response = await fetch('/assets/full-body-example.png');
     if (!response.ok) throw new Error('Sample image could not be loaded.');
@@ -393,11 +400,19 @@ function setUploadedImage(imageDataUrl) {
   dom.uploadPlaceholder.classList.add('hidden');
   dom.uploadPreviewContainer.classList.remove('hidden');
   dom.btnSubmitScan.disabled = false;
+  dom.btnTrySample.disabled = true;
+  dom.btnTrySample.textContent = '내 사진 선택됨 ✓';
+  dom.sampleTipText.textContent = '이제 샘플 대신 내 OOTD로 패션력을 측정할 차례예요.';
 }
 
 function rejectImageUpload(message) {
   dom.imageFileInput.value = '';
-  if (!state.currentOotdImage) dom.btnSubmitScan.disabled = true;
+  if (!state.currentOotdImage) {
+    dom.btnSubmitScan.disabled = true;
+    dom.btnTrySample.disabled = false;
+    dom.btnTrySample.textContent = '샘플 체험 ⚡';
+    dom.sampleTipText.textContent = '사진을 고르기 전에 결과 화면을 가볍게 구경해 보세요.';
+  }
   showToast(message);
 }
 
@@ -1368,8 +1383,9 @@ function resetToUploadScreen() {
   dom.styleEditOverlay.classList.remove('flex');
   dom.analysisErrorPanel.classList.add('hidden');
   dom.btnTrySample.disabled = false;
-  dom.btnTrySample.textContent = '샘플로 10초 체험 ⚡';
-  dom.btnTrySample.classList.remove('hidden');
+  dom.btnTrySample.textContent = '샘플 체험 ⚡';
+  dom.sampleTipText.textContent = '사진을 고르기 전에 결과 화면을 가볍게 구경해 보세요.';
+  dom.sampleTipCard.classList.remove('hidden');
   
   // 핀 복원 및 클릭 리스너 청소
   dom.pinDevil.classList.remove('hidden');
