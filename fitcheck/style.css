@@ -109,7 +109,7 @@ section.active-screen {
 }
 
 /* 8. 툴팁 말풍선 오버레이 */
-#feedback-tooltip {
+#feedback-tooltip.tooltip-reveal {
   animation: slide-in-tooltip 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
@@ -133,13 +133,22 @@ section.active-screen {
 @keyframes neo-pin-pulse {
   0%, 100% {
     box-shadow: 1px 1px 0 0 #000000;
+    transform: scale(1);
   }
   50% {
-    box-shadow: 2px 2px 0 0 #000000;
-    transform: scale(1.02) translate(-0.25px, -0.25px);
+    box-shadow: 1px 1px 0 0 #000000;
+    transform: scale(1.04);
   }
 }
 
-#pin-angel, #pin-devil {
+[data-pin-type] {
   animation: neo-pin-pulse 2.2s infinite ease-in-out;
+  border-width: 2px !important;
+  box-sizing: border-box;
+}
+
+[data-pin-type].pin-selected {
+  animation: none;
+  transform: scale(1.12) rotate(-5deg);
+  box-shadow: 2px 2px 0 0 #000000;
 }

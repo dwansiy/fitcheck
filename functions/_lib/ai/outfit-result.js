@@ -14,6 +14,7 @@ const WORST_MATCH_SCHEMA = Object.freeze({
   properties: {
     ...MATCH_SCHEMA.properties,
     recommendItem: { type: 'string' },
+    recommendReason: { type: 'string' },
     reasonTags: {
       type: 'array',
       items: { type: 'string' },
@@ -21,7 +22,7 @@ const WORST_MATCH_SCHEMA = Object.freeze({
       maxItems: 3,
     },
   },
-  required: [...MATCH_SCHEMA.required, 'recommendItem'],
+  required: [...MATCH_SCHEMA.required, 'recommendItem', 'recommendReason', 'reasonTags'],
 });
 
 export const OUTFIT_RESULT_SCHEMA = Object.freeze({
@@ -96,6 +97,8 @@ function normalizeOutfitResult(result, tpo) {
     };
     if (withRecommendation) {
       normalized.recommendItem = cleanText(match.recommendItem);
+      normalized.recommendReason = cleanText(match.recommendReason)
+        || `${normalized.recommendItem} 하나면 코디 밸런스가 제자리로 돌아옵니다. 패션 구조대 출동 완료!`;
       const tags = Array.isArray(match.reasonTags)
         ? match.reasonTags.map(cleanText).filter(Boolean).slice(0, 3)
         : [];
@@ -142,7 +145,10 @@ function validateOutfitResult(result, { requireEditDecision = false } = {}) {
     && isNonEmptyText(value.name)
     && isIntegerInRange(value.x, 0, 100)
     && isIntegerInRange(value.y, 0, 100)
-    && (!withRecommendation || isNonEmptyText(value.recommendItem));
+    && (!withRecommendation || (
+      isNonEmptyText(value.recommendItem)
+      && isNonEmptyText(value.recommendReason)
+    ));
   const stats = result?.stats && Object.entries(result.stats);
 
   const valid = result

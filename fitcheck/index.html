@@ -260,14 +260,6 @@
           <span class="animate-bounce text-xs">💡</span><span id="pin-interaction-text">OOTD 위의 😇 베스트 1개 / 😈 개선 포인트를 탭해 보세요!</span>
         </div>
 
-        <div id="devil-summary-card" class="hidden w-full bg-error-container border-b-[3px] border-black p-4">
-          <div class="flex items-center justify-between gap-2 mb-2">
-            <p id="devil-summary-title" class="font-headline text-xs font-black">😈 개선 포인트</p>
-            <span class="text-[9px] font-bold">탭해서 처방전 보기</span>
-          </div>
-          <div id="devil-summary-items" class="flex flex-col gap-2"></div>
-        </div>
-
         <div id="improved-shopping-card" class="hidden w-full bg-secondary border-b-[3px] border-black p-4">
           <div class="flex items-center justify-between gap-3">
             <div class="min-w-0">
@@ -290,6 +282,12 @@
             <button id="btn-close-tooltip" class="text-xl font-bold leading-none hover:text-error">&times;</button>
           </div>
           <p id="tooltip-content" class="text-xs font-bold mb-3 leading-relaxed text-black">추천 코멘트 내용</p>
+          <div id="tooltip-recommendation" class="hidden mb-3 bg-white border-[2px] border-black p-3 shadow-[3px_3px_0_#000]">
+            <p class="text-[9px] font-black uppercase tracking-wide">⚡ FITCHECK 처방전</p>
+            <p id="tooltip-recommend-item" class="font-headline text-sm font-black mt-1 text-black"></p>
+            <div id="tooltip-reason-tags" class="flex flex-wrap gap-1 mt-2"></div>
+            <p id="tooltip-recommend-reason" class="text-[10px] font-bold leading-relaxed mt-2 text-on-surface-variant"></p>
+          </div>
           <div class="flex gap-2">
             <a id="link-shopping" href="" target="_blank" rel="noopener noreferrer" class="flex-1 bg-white border-[2px] border-black p-3 font-bold text-center text-xs neo-shadow hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all flex items-center justify-center gap-1 text-black">
               실제 상품 보기 <span class="material-symbols-outlined text-xs">open_in_new</span>

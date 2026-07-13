@@ -81,6 +81,10 @@ const dom = {
   feedbackTooltip: document.getElementById('feedback-tooltip'),
   tooltipTitle: document.getElementById('tooltip-title'),
   tooltipContent: document.getElementById('tooltip-content'),
+  tooltipRecommendation: document.getElementById('tooltip-recommendation'),
+  tooltipRecommendItem: document.getElementById('tooltip-recommend-item'),
+  tooltipReasonTags: document.getElementById('tooltip-reason-tags'),
+  tooltipRecommendReason: document.getElementById('tooltip-recommend-reason'),
   btnCloseTooltip: document.getElementById('btn-close-tooltip'),
   linkShopping: document.getElementById('link-shopping'),
   btnApplyAdvice: document.getElementById('btn-apply-advice'),
@@ -98,9 +102,6 @@ const dom = {
   improvedShoppingLink: document.getElementById('improved-shopping-link'),
   improvementChangeSummary: document.getElementById('improvement-change-summary'),
   improvementChangeItems: document.getElementById('improvement-change-items'),
-  devilSummaryCard: document.getElementById('devil-summary-card'),
-  devilSummaryTitle: document.getElementById('devil-summary-title'),
-  devilSummaryItems: document.getElementById('devil-summary-items'),
   pinInteractionText: document.getElementById('pin-interaction-text'),
   
   resultScoreNum: document.getElementById('result-score-num'),
@@ -592,7 +593,6 @@ function calculateFashionResults() {
     dom.feedbackTooltip.classList.add('hidden');
     if (dom.resultTopOverlayBadge) dom.resultTopOverlayBadge.classList.add('hidden');
     if (dom.pinInteractionGuide) dom.pinInteractionGuide.classList.add('hidden');
-    dom.devilSummaryCard.classList.add('hidden');
 
     // 상대방 스펙 바인딩
     dom.vsOppScore.textContent = `${state.opponentScore.toLocaleString()}점`;
@@ -642,19 +642,21 @@ function setupPins() {
   document.querySelectorAll('.dynamic-fit-pin').forEach((pin) => pin.remove());
   renderMatchPins('angel', state.bestMatches, dom.pinAngel, '😇', 'bg-white');
   renderMatchPins('devil', state.worstMatches, dom.pinDevil, '😈', 'bg-error-container');
-  renderDevilSummary();
+  dom.pinInteractionText.textContent = 'OOTD 위의 😇 베스트와 😈 개선 포인트를 탭해 보세요!';
 }
 
 function renderMatchPins(type, matches, basePin, emoji, backgroundClass) {
-  const showNumbers = type === 'devil' && matches.length > 1;
   matches.forEach((match, index) => {
     const pin = index === 0 ? basePin : basePin.cloneNode(true);
-    pin.className = `absolute ${backgroundClass} border-2 border-black rounded-full shadow-[1px_1px_0px_0px_#000] z-20 cursor-pointer transition-all flex items-center justify-center ${showNumbers ? 'w-9 h-7 text-[11px]' : 'w-7 h-7 text-sm'} ${index ? 'dynamic-fit-pin' : ''}`;
+    pin.className = `absolute ${backgroundClass} border-2 border-black rounded-full shadow-[1px_1px_0px_0px_#000] z-20 cursor-pointer transition-all flex items-center justify-center w-7 h-7 text-sm ${index ? 'dynamic-fit-pin' : ''}`;
     pin.style.top = `${match.y}%`;
     pin.style.left = `${match.x}%`;
     pin.dataset.pinType = type;
     pin.dataset.pinIndex = String(index);
-    pin.querySelector('span').textContent = showNumbers ? `${emoji}${index + 1}` : emoji;
+    pin.setAttribute('role', 'button');
+    pin.setAttribute('tabindex', '0');
+    pin.setAttribute('aria-label', type === 'devil' ? '개선 포인트 열기' : '베스트 포인트 열기');
+    pin.querySelector('span').textContent = emoji;
     pin.classList.remove('hidden');
     if (index > 0) {
       pin.removeAttribute('id');
@@ -664,66 +666,30 @@ function renderMatchPins(type, matches, basePin, emoji, backgroundClass) {
   });
 }
 
-function renderDevilSummary() {
-  const matches = state.worstMatches || [];
-  dom.devilSummaryItems.textContent = '';
-  if (!matches.length || state.isBattleMode || state.isPatched) {
-    dom.devilSummaryCard.classList.add('hidden');
-    return;
-  }
-
-  const showNumbers = matches.length > 1;
-  dom.devilSummaryTitle.textContent = showNumbers ? `😈 개선 포인트 ${matches.length}개` : '😈 개선 포인트';
-  dom.pinInteractionText.textContent = showNumbers
-    ? `OOTD 위의 😇 베스트와 😈1~${matches.length} 개선 포인트를 탭해 보세요!`
-    : 'OOTD 위의 😇 베스트와 😈 개선 포인트를 탭해 보세요!';
-
-  matches.forEach((match, index) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'w-full bg-white border-[2px] border-black p-2.5 text-left flex items-center gap-2 hover:translate-x-[1px] hover:translate-y-[1px] transition-transform';
-
-    const marker = document.createElement('span');
-    marker.className = 'shrink-0 font-black text-xs';
-    marker.textContent = showNumbers ? `😈${index + 1}` : '😈';
-
-    const copy = document.createElement('span');
-    copy.className = 'min-w-0 flex-1';
-    const item = document.createElement('strong');
-    item.className = 'block font-headline text-[11px] truncate';
-    item.textContent = match.recommendItem;
-    const reason = document.createElement('small');
-    reason.className = 'block text-[9px] font-bold text-on-surface-variant truncate';
-    reason.textContent = (match.reasonTags || []).map((tag) => `#${tag}`).join(' ');
-    copy.append(item, reason);
-    button.append(marker, copy);
-    button.addEventListener('click', () => showPinTooltip('devil', index));
-    dom.devilSummaryItems.appendChild(button);
-  });
-
-  dom.devilSummaryCard.classList.remove('hidden');
-}
-
 // 핀 상세 정보 툴팁 노출
 function showPinTooltip(type, index = 0) {
   dom.feedbackTooltip.classList.remove('hidden');
+  dom.feedbackTooltip.classList.remove('tooltip-reveal');
+  void dom.feedbackTooltip.offsetWidth;
+  dom.feedbackTooltip.classList.add('tooltip-reveal');
   playSound('select');
   document.querySelectorAll('[data-pin-type]').forEach((pin) => {
-    pin.classList.remove('ring-[5px]', 'ring-black', 'scale-110');
+    pin.classList.remove('pin-selected');
   });
   document.querySelector(`[data-pin-type="${type}"][data-pin-index="${index}"]`)
-    ?.classList.add('ring-[5px]', 'ring-black', 'scale-110');
+    ?.classList.add('pin-selected');
 
   if (type === 'angel') {
     dom.tooltipTitle.textContent = "😇 BEST MATCH";
     dom.tooltipTitle.className = "font-headline font-black text-xs uppercase px-2 py-0.5 border-[2px] border-black bg-secondary text-black";
     dom.tooltipContent.textContent = state.bestMatches[index].name;
+    dom.tooltipRecommendation.classList.add('hidden');
     
     // Angel은 쇼핑몰 추천 및 코디적용 숨김
     dom.linkShopping.classList.add('hidden');
     dom.btnApplyAdvice.classList.add('hidden');
   } else {
-    dom.tooltipTitle.textContent = "😈 WORST MATCH";
+    dom.tooltipTitle.textContent = "😈 개선 포인트";
     dom.tooltipTitle.className = "font-headline font-black text-xs uppercase px-2 py-0.5 border-[2px] border-black bg-error-container text-black";
     
     const selectedMatch = state.worstMatches[index];
@@ -731,6 +697,16 @@ function showPinTooltip(type, index = 0) {
     let query = encodeURIComponent(selectedMatch.recommendItem);
 
     dom.tooltipContent.textContent = comment;
+    dom.tooltipRecommendItem.textContent = selectedMatch.recommendItem;
+    dom.tooltipRecommendReason.textContent = selectedMatch.recommendReason;
+    dom.tooltipReasonTags.textContent = '';
+    (selectedMatch.reasonTags || []).forEach((tag) => {
+      const chip = document.createElement('span');
+      chip.className = 'bg-secondary border-[2px] border-black px-2 py-0.5 text-[9px] font-black';
+      chip.textContent = `#${tag}`;
+      dom.tooltipReasonTags.appendChild(chip);
+    });
+    dom.tooltipRecommendation.classList.remove('hidden');
     state.worstMatch = selectedMatch;
     state.targetMusinsaItem = selectedMatch.recommendItem;
     state.targetMusinsaUrl = `https://www.musinsa.com/search/goods?keyword=${query}`;
@@ -756,7 +732,7 @@ function showPinTooltip(type, index = 0) {
 function hideTooltip() {
   dom.feedbackTooltip.classList.add('hidden');
   document.querySelectorAll('[data-pin-type]').forEach((pin) => {
-    pin.classList.remove('ring-[5px]', 'ring-black', 'scale-110');
+    pin.classList.remove('pin-selected');
   });
 }
 
@@ -764,7 +740,6 @@ function hideTooltip() {
 function startInlineStyleEdit(recommendItemName) {
   const messages = [
     `${recommendItemName} 코디 시뮬레이션 가동 중...`,
-    '얼굴과 포즈는 그대로 잠금 완료 🔒',
     '새 아이템의 핏만 살짝 다듬는 중...',
     '원래 조명과 배경을 단속하는 중...',
     '코디 밸런스에 패션 소금 한 꼬집...',
@@ -899,7 +874,6 @@ async function applyStyleAdvice() {
   dom.improvedShoppingLink.href = `https://www.musinsa.com/search/goods?keyword=${encodeURIComponent(recommendItemName)}`;
   dom.improvedShoppingCard.classList.remove('hidden');
   dom.pinInteractionGuide.classList.add('hidden');
-  dom.devilSummaryCard.classList.add('hidden');
   showImageVersion('after');
   showToast('코디 적용 완료! BEFORE / AFTER로 변신을 확인해 보세요. ✨');
 }
@@ -1390,7 +1364,6 @@ function resetToUploadScreen() {
   dom.improvedShoppingCard.classList.add('hidden');
   dom.improvementChangeSummary.classList.add('hidden');
   dom.achievementCard.classList.add('hidden');
-  dom.devilSummaryCard.classList.add('hidden');
   dom.styleEditOverlay.classList.add('hidden');
   dom.styleEditOverlay.classList.remove('flex');
   dom.analysisErrorPanel.classList.add('hidden');
