@@ -105,75 +105,6 @@ section.active-screen {
   gap: 0.5rem;
 }
 
-.stat-score {
-  line-height: 1;
-}
-
-.stat-delta-badge {
-  display: inline-flex;
-  justify-content: center;
-  margin-top: 0.2rem;
-  padding: 0.16rem 0.22rem;
-  border: 1px solid #000;
-  background: #fff;
-  font-family: 'Lexend', sans-serif;
-  font-size: 0.46rem;
-  font-weight: 900;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.stat-bar-change.is-improvement {
-  background-color: #8ce7c7;
-  background-image: repeating-linear-gradient(
-    -45deg,
-    #8ce7c7 0,
-    #8ce7c7 6px,
-    #c9c1ff 6px,
-    #c9c1ff 12px
-  );
-  background-size: 18px 18px;
-}
-
-.stat-bar-change.is-regression {
-  background-color: #ba1a1a;
-}
-
-.stat-bar-change.is-improvement.is-animated {
-  animation: stat-stripe-flow 0.45s linear 4, stat-gain-pop 0.75s ease-out both;
-}
-
-.stat-delta-badge.is-improvement {
-  background-image: linear-gradient(135deg, #8ce7c7 0 50%, #c9c1ff 50% 100%);
-  color: #052f24;
-}
-
-.stat-delta-badge.is-regression {
-  background: #ffdad6;
-}
-
-.stat-delta-badge.is-improvement.is-animated {
-  animation: stat-delta-pop 0.8s cubic-bezier(0.2, 1.5, 0.5, 1) both;
-}
-
-@keyframes stat-stripe-flow {
-  from { background-position: 0 0; }
-  to { background-position: 18px 0; }
-}
-
-@keyframes stat-gain-pop {
-  0% { filter: brightness(1.35); }
-  45% { filter: brightness(1); }
-  70% { filter: brightness(1.25); }
-  100% { filter: brightness(1); }
-}
-
-@keyframes stat-delta-pop {
-  0% { transform: scale(0.65) rotate(-5deg); opacity: 0; }
-  70% { transform: scale(1.12) rotate(1deg); opacity: 1; }
-  100% { transform: scale(1) rotate(0); opacity: 1; }
-}
-
 @media (max-width: 390px) {
   .stat-row {
     grid-template-columns: minmax(7.75rem, auto) minmax(3rem, 1fr) 4.25rem;
@@ -183,13 +114,6 @@ section.active-screen {
   .stat-name {
     font-size: 0.65rem;
     letter-spacing: -0.035em;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .stat-bar-change.is-improvement.is-animated,
-  .stat-delta-badge.is-improvement.is-animated {
-    animation: none;
   }
 }
 

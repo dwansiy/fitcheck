@@ -118,8 +118,6 @@ const dom = {
   
   resultScoreNum: document.getElementById('result-score-num'),
   resultTierName: document.getElementById('result-tier-name'),
-  btnOpenPrimaryImprovement: document.getElementById('btn-open-primary-improvement'),
-  resultImprovementCount: document.getElementById('result-improvement-count'),
   achievementCard: document.getElementById('achievement-card'),
   achievementTitle: document.getElementById('achievement-title'),
   achievementDescription: document.getElementById('achievement-description'),
@@ -249,7 +247,6 @@ function bindEvents() {
   dom.pinDevil.addEventListener('click', () => showPinTooltip('devil', 0));
   dom.btnCloseTooltip.addEventListener('click', hideTooltip);
   dom.btnNextImprovement.addEventListener('click', showNextImprovement);
-  dom.btnOpenPrimaryImprovement.addEventListener('click', () => showPinTooltip('devil', 0));
 
   // 6. 추천 코디 적용 (Devil 피드백 교체)
   dom.btnApplyAdvice.addEventListener('click', applyStyleAdvice);
@@ -634,7 +631,6 @@ function calculateFashionResults() {
     dom.feedbackTooltip.classList.add('hidden');
     if (dom.resultTopOverlayBadge) dom.resultTopOverlayBadge.classList.add('hidden');
     if (dom.pinInteractionGuide) dom.pinInteractionGuide.classList.add('hidden');
-    dom.btnOpenPrimaryImprovement.classList.add('hidden');
 
     // 상대방 스펙 바인딩
     dom.vsOppScore.textContent = `${state.opponentScore.toLocaleString()}점`;
@@ -672,7 +668,6 @@ function calculateFashionResults() {
     setupPins();
     if (dom.resultTopOverlayBadge) dom.resultTopOverlayBadge.classList.remove('hidden');
     if (dom.pinInteractionGuide) dom.pinInteractionGuide.classList.remove('hidden');
-    dom.btnOpenPrimaryImprovement.classList.remove('hidden');
   }
 
   // 점수판 그리기 및 카운트업
@@ -686,7 +681,6 @@ function setupPins() {
   renderMatchPins('angel', state.bestMatches, dom.pinAngel, '😇', 'bg-white');
   renderMatchPins('devil', state.worstMatches, dom.pinDevil, '😈', 'bg-error-container');
   dom.pinInteractionText.textContent = '사진 속 😇·😈 핀을 직접 눌러도 확인할 수 있어요.';
-  dom.resultImprovementCount.textContent = `핵심 개선 ${state.worstMatches.length}개`;
 }
 
 function renderMatchPins(type, matches, basePin, emoji, backgroundClass) {
@@ -959,7 +953,6 @@ async function applyStyleAdvice() {
   dom.improvedShoppingCard.classList.remove('hidden');
   renderRemainingRecommendations(appliedMatchIndex);
   dom.pinInteractionGuide.classList.add('hidden');
-  dom.btnOpenPrimaryImprovement.classList.add('hidden');
   showImageVersion('after');
   showToast('코디 적용 완료! BEFORE / AFTER로 변신을 확인해 보세요. ✨');
 }
@@ -1468,7 +1461,7 @@ function renderVibeStats() {
       ? `${rawDelta > 0 ? '+' : ''}${rawDelta} ${rawDelta > 0 ? 'UP!' : 'DOWN!'}`
       : '';
     const changeTextClass = improvement > 0 ? 'text-[#087f5b]' : 'text-error';
-    const changeStateClass = improvement > 0 ? 'is-improvement' : 'is-regression';
+    const changeBarClass = improvement > 0 ? 'bg-secondary' : 'bg-error';
 
     const statItem = document.createElement('div');
     statItem.className = "flex flex-col gap-1 cursor-pointer group w-full";
@@ -1477,9 +1470,9 @@ function renderVibeStats() {
         <span class="stat-name font-bold text-[11px] uppercase tracking-tight text-black whitespace-nowrap"></span>
         <div class="flex-1 h-5 border-[3px] border-black bg-white flex overflow-hidden">
           <div class="stat-bar-base ${barColor} h-full transition-all duration-700" style="width: 0%;"></div>
-          <div class="stat-bar-gain stat-bar-change ${changeStateClass} h-full transition-all duration-700" style="width: 0%;"></div>
+          <div class="stat-bar-gain ${changeBarClass} h-full transition-all duration-700" style="width: 0%;"></div>
         </div>
-        <span class="stat-score text-right text-xs font-headline font-black text-black">${stat.val}%${change ? `<small class="stat-delta-badge ${changeStateClass} ${changeTextClass}">${changeLabel}</small>` : ''}</span>
+        <span class="text-right text-xs font-headline font-black text-black">${stat.val}%${change ? `<small class="block text-[8px] ${changeTextClass}">${changeLabel}</small>` : ''}</span>
       </div>
       <div class="stat-desc-container hidden w-full"></div>
     `;
@@ -1514,12 +1507,8 @@ function renderVibeStats() {
       const baseEl = statItem.querySelector('.stat-bar-base');
       const gainEl = statItem.querySelector('.stat-bar-gain');
       if (baseEl) baseEl.style.width = `${baseline}%`;
-      if (gainEl) {
-        gainEl.style.width = `${change}%`;
-        if (improvement > 0) gainEl.classList.add('is-animated');
-      }
-      if (improvement > 0) statItem.querySelector('.stat-delta-badge')?.classList.add('is-animated');
-    }, 80 + (idx * 90));
+      if (gainEl) gainEl.style.width = `${change}%`;
+    }, 50);
   });
 }
 
@@ -1595,7 +1584,6 @@ function resetToUploadScreen() {
   dom.remainingRecommendations.classList.add('hidden');
   dom.remainingRecommendationItems.textContent = '';
   dom.achievementCard.classList.add('hidden');
-  dom.btnOpenPrimaryImprovement.classList.add('hidden');
   dom.styleEditOverlay.classList.add('hidden');
   dom.styleEditOverlay.classList.remove('flex');
   dom.analysisErrorPanel.classList.add('hidden');
