@@ -726,9 +726,9 @@ function showPinTooltip(type, index = 0) {
     state.targetMusinsaItem = selectedMatch.recommendItem;
     state.targetMusinsaUrl = `https://www.musinsa.com/search/goods?keyword=${query}`;
     dom.linkShopping.href = "#";
-    
-    // 개선 전에는 적용 버튼만 노출하고 쇼핑 링크는 개선 완료 후 별도 카드에서 제공한다.
-    dom.linkShopping.classList.add('hidden');
+
+    // 가상 적용 전에도 실제 상품을 먼저 둘러보거나 코디 적용을 선택할 수 있다.
+    dom.linkShopping.classList.remove('hidden');
     if (state.isPatched) {
       dom.btnApplyAdvice.classList.add('hidden'); // 이미 적용되었으면 감춤
     } else {
