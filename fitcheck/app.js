@@ -31,6 +31,7 @@ const state = {
   // AI API 결과 임시 보관
   apiData: null,
   improvementChanges: [],
+  originalWorstMatches: [],
   achievement: null,
   currentRecordId: null,
   selectedWorstMatchIndex: 0,
@@ -107,6 +108,8 @@ const dom = {
   improvedShoppingLink: document.getElementById('improved-shopping-link'),
   improvementChangeSummary: document.getElementById('improvement-change-summary'),
   improvementChangeItems: document.getElementById('improvement-change-items'),
+  remainingRecommendations: document.getElementById('remaining-recommendations'),
+  remainingRecommendationItems: document.getElementById('remaining-recommendation-items'),
   pinInteractionText: document.getElementById('pin-interaction-text'),
   
   resultScoreNum: document.getElementById('result-score-num'),
@@ -586,6 +589,10 @@ function calculateFashionResults() {
   state.tier = state.apiData.tier;
   state.bestMatches = state.apiData.bestMatches;
   state.worstMatches = state.apiData.worstMatches;
+  state.originalWorstMatches = state.worstMatches.map((match) => ({
+    ...match,
+    reasonTags: [...(match.reasonTags || [])],
+  }));
   state.bestMatch = state.bestMatches[0];
   state.worstMatch = state.worstMatches[0];
   state.musinsaQuery = state.apiData.musinsaQuery;
@@ -826,6 +833,7 @@ async function applyStyleAdvice() {
   if (state.isPatched) return;
 
   dom.btnApplyAdvice.disabled = true;
+  const appliedMatchIndex = state.selectedWorstMatchIndex;
   const recommendItemName = state.targetMusinsaItem || "독일군 스니커즈";
   const previousScore = state.score;
   const previousStats = new Map(state.stats.map((stat) => [stat.name, stat.val]));
@@ -908,9 +916,43 @@ async function applyStyleAdvice() {
     || `${recommendItemName}(으)로 갈아입혀 ${state.selectedTpo} 무드와 전체 밸런스가 한층 또렷해졌어요. 문제 아이템은 퇴근 완료!`;
   dom.improvedShoppingLink.href = `https://www.musinsa.com/search/goods?keyword=${encodeURIComponent(recommendItemName)}`;
   dom.improvedShoppingCard.classList.remove('hidden');
+  renderRemainingRecommendations(appliedMatchIndex);
   dom.pinInteractionGuide.classList.add('hidden');
   showImageVersion('after');
   showToast('코디 적용 완료! BEFORE / AFTER로 변신을 확인해 보세요. ✨');
+}
+
+function renderRemainingRecommendations(appliedMatchIndex) {
+  const remainingMatches = state.originalWorstMatches.filter((_, index) => index !== appliedMatchIndex);
+  dom.remainingRecommendationItems.textContent = '';
+  dom.remainingRecommendations.classList.toggle('hidden', remainingMatches.length === 0);
+
+  remainingMatches.forEach((match) => {
+    const row = document.createElement('div');
+    row.className = 'bg-white border-[2px] border-black p-2.5 flex items-center justify-between gap-3';
+
+    const copy = document.createElement('div');
+    copy.className = 'min-w-0';
+    const item = document.createElement('p');
+    item.className = 'font-headline text-[11px] font-black';
+    item.textContent = match.recommendItem;
+    const tags = document.createElement('p');
+    tags.className = 'text-[9px] font-bold text-on-surface-variant mt-0.5';
+    tags.textContent = (match.reasonTags || []).map((tag) => `#${tag}`).join(' ');
+    copy.append(item, tags);
+
+    const link = document.createElement('a');
+    link.className = 'shrink-0 bg-cream border-[2px] border-black px-2.5 py-2 text-[9px] font-black hover:bg-secondary transition-colors';
+    link.href = `https://www.musinsa.com/search/goods?keyword=${encodeURIComponent(match.recommendItem)}`;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = '상품 찾기 ↗';
+    link.dataset.shoppingLink = 'true';
+    link.dataset.itemName = match.recommendItem;
+
+    row.append(copy, link);
+    dom.remainingRecommendationItems.appendChild(row);
+  });
 }
 
 function showImageVersion(version) {
@@ -1393,12 +1435,15 @@ function resetToUploadScreen() {
   state.isPatched = false;
   state.apiData = null; // API 데이터 리셋
   state.improvementChanges = [];
+  state.originalWorstMatches = [];
   state.achievement = null;
   state.currentRecordId = null;
   state.selectedWorstMatchIndex = 0;
   dom.imageVersionToggle.classList.add('hidden');
   dom.improvedShoppingCard.classList.add('hidden');
   dom.improvementChangeSummary.classList.add('hidden');
+  dom.remainingRecommendations.classList.add('hidden');
+  dom.remainingRecommendationItems.textContent = '';
   dom.achievementCard.classList.add('hidden');
   dom.styleEditOverlay.classList.add('hidden');
   dom.styleEditOverlay.classList.remove('flex');
