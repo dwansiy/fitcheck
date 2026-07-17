@@ -115,6 +115,8 @@ const dom = {
   
   resultScoreNum: document.getElementById('result-score-num'),
   resultTierName: document.getElementById('result-tier-name'),
+  btnOpenPrimaryImprovement: document.getElementById('btn-open-primary-improvement'),
+  resultImprovementCount: document.getElementById('result-improvement-count'),
   achievementCard: document.getElementById('achievement-card'),
   achievementTitle: document.getElementById('achievement-title'),
   achievementDescription: document.getElementById('achievement-description'),
@@ -244,6 +246,7 @@ function bindEvents() {
   dom.pinDevil.addEventListener('click', () => showPinTooltip('devil', 0));
   dom.btnCloseTooltip.addEventListener('click', hideTooltip);
   dom.btnNextImprovement.addEventListener('click', showNextImprovement);
+  dom.btnOpenPrimaryImprovement.addEventListener('click', () => showPinTooltip('devil', 0));
 
   // 6. 추천 코디 적용 (Devil 피드백 교체)
   dom.btnApplyAdvice.addEventListener('click', applyStyleAdvice);
@@ -628,6 +631,7 @@ function calculateFashionResults() {
     dom.feedbackTooltip.classList.add('hidden');
     if (dom.resultTopOverlayBadge) dom.resultTopOverlayBadge.classList.add('hidden');
     if (dom.pinInteractionGuide) dom.pinInteractionGuide.classList.add('hidden');
+    dom.btnOpenPrimaryImprovement.classList.add('hidden');
 
     // 상대방 스펙 바인딩
     dom.vsOppScore.textContent = `${state.opponentScore.toLocaleString()}점`;
@@ -665,6 +669,7 @@ function calculateFashionResults() {
     setupPins();
     if (dom.resultTopOverlayBadge) dom.resultTopOverlayBadge.classList.remove('hidden');
     if (dom.pinInteractionGuide) dom.pinInteractionGuide.classList.remove('hidden');
+    dom.btnOpenPrimaryImprovement.classList.remove('hidden');
   }
 
   // 점수판 그리기 및 카운트업
@@ -677,7 +682,8 @@ function setupPins() {
   document.querySelectorAll('.dynamic-fit-pin').forEach((pin) => pin.remove());
   renderMatchPins('angel', state.bestMatches, dom.pinAngel, '😇', 'bg-white');
   renderMatchPins('devil', state.worstMatches, dom.pinDevil, '😈', 'bg-error-container');
-  dom.pinInteractionText.textContent = 'OOTD 위의 😇 베스트와 😈 개선 포인트를 탭해 보세요!';
+  dom.pinInteractionText.textContent = '사진 속 😇·😈 핀을 직접 눌러도 확인할 수 있어요.';
+  dom.resultImprovementCount.textContent = `핵심 개선 ${state.worstMatches.length}개`;
 }
 
 function renderMatchPins(type, matches, basePin, emoji, backgroundClass) {
@@ -929,6 +935,7 @@ async function applyStyleAdvice() {
   dom.improvedShoppingCard.classList.remove('hidden');
   renderRemainingRecommendations(appliedMatchIndex);
   dom.pinInteractionGuide.classList.add('hidden');
+  dom.btnOpenPrimaryImprovement.classList.add('hidden');
   showImageVersion('after');
   showToast('코디 적용 완료! BEFORE / AFTER로 변신을 확인해 보세요. ✨');
 }
@@ -1456,6 +1463,7 @@ function resetToUploadScreen() {
   dom.remainingRecommendations.classList.add('hidden');
   dom.remainingRecommendationItems.textContent = '';
   dom.achievementCard.classList.add('hidden');
+  dom.btnOpenPrimaryImprovement.classList.add('hidden');
   dom.styleEditOverlay.classList.add('hidden');
   dom.styleEditOverlay.classList.remove('flex');
   dom.analysisErrorPanel.classList.add('hidden');
