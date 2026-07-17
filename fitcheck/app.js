@@ -1468,18 +1468,18 @@ function renderVibeStats() {
       ? `${rawDelta > 0 ? '+' : ''}${rawDelta} ${rawDelta > 0 ? 'UP!' : 'DOWN!'}`
       : '';
     const changeTextClass = improvement > 0 ? 'text-[#087f5b]' : 'text-error';
-    const changeBarClass = improvement > 0 ? 'bg-secondary' : 'bg-error';
+    const changeStateClass = improvement > 0 ? 'is-improvement' : 'is-regression';
 
     const statItem = document.createElement('div');
     statItem.className = "flex flex-col gap-1 cursor-pointer group w-full";
     statItem.innerHTML = `
-      <div class="flex items-center gap-2 w-full hover:translate-x-[2px] transition-transform">
-        <span class="stat-name w-24 font-bold text-xs uppercase tracking-tight text-black"></span>
+      <div class="stat-row w-full hover:translate-x-[2px] transition-transform">
+        <span class="stat-name font-bold text-[11px] uppercase tracking-tight text-black whitespace-nowrap"></span>
         <div class="flex-1 h-5 border-[3px] border-black bg-white flex overflow-hidden">
           <div class="stat-bar-base ${barColor} h-full transition-all duration-700" style="width: 0%;"></div>
-          <div class="stat-bar-gain ${changeBarClass} h-full transition-all duration-700" style="width: 0%;"></div>
+          <div class="stat-bar-gain stat-bar-change ${changeStateClass} h-full transition-all duration-700" style="width: 0%;"></div>
         </div>
-        <span class="w-14 text-right text-xs font-headline font-black text-black">${stat.val}%${change ? `<small class="block text-[8px] ${changeTextClass}">${changeLabel}</small>` : ''}</span>
+        <span class="stat-score text-right text-xs font-headline font-black text-black">${stat.val}%${change ? `<small class="stat-delta-badge ${changeStateClass} ${changeTextClass}">${changeLabel}</small>` : ''}</span>
       </div>
       <div class="stat-desc-container hidden w-full"></div>
     `;
@@ -1514,8 +1514,12 @@ function renderVibeStats() {
       const baseEl = statItem.querySelector('.stat-bar-base');
       const gainEl = statItem.querySelector('.stat-bar-gain');
       if (baseEl) baseEl.style.width = `${baseline}%`;
-      if (gainEl) gainEl.style.width = `${change}%`;
-    }, 50);
+      if (gainEl) {
+        gainEl.style.width = `${change}%`;
+        if (improvement > 0) gainEl.classList.add('is-animated');
+      }
+      if (improvement > 0) statItem.querySelector('.stat-delta-badge')?.classList.add('is-animated');
+    }, 80 + (idx * 90));
   });
 }
 
