@@ -189,9 +189,7 @@
         <!-- 카드 상단 헤더 스트립 -->
         <div class="flex items-center justify-between p-4 border-b-[3px] border-black bg-cream">
           <h2 id="result-header-title" class="font-headline font-black italic text-lg tracking-tighter uppercase text-black">FITCHECK! RESULT</h2>
-          <div id="result-header-badge" class="bg-secondary border-[2px] border-black px-3 py-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-xs font-bold rotate-[2deg] text-black">
-            QC PASSED ✅
-          </div>
+          <div id="result-header-badge" class="hidden"></div>
         </div>
 
         <!-- 1:1 이미지 및 엔젤/데빌 마커 영역 (긴쪽 기준 맞춤 및 외곽선 안쪽 채우기 bg-[#eeeeee] flex items-center justify-center 적용) -->
@@ -307,6 +305,7 @@
             <p id="tooltip-recommend-reason" class="text-[10px] font-bold leading-relaxed mt-2 text-on-surface-variant"></p>
             <button id="btn-next-improvement" type="button" class="hidden w-full mt-3 bg-cream border-[2px] border-black px-3 py-2 text-[10px] font-black text-left hover:bg-secondary transition-colors">다음 개선 포인트 보기 →</button>
           </div>
+          <p id="style-edit-policy-note" class="hidden mb-3 bg-cream border-[2px] border-black p-2.5 text-[10px] font-bold leading-relaxed text-black">이 아이템은 사진 적용 대신 비슷한 상품 찾기만 지원해요.</p>
           <div class="flex gap-2">
             <a id="link-shopping" href="" target="_blank" rel="noopener noreferrer" data-shopping-link="true" class="flex-1 bg-white border-[2px] border-black p-3 font-bold text-center text-xs neo-shadow hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all flex items-center justify-center gap-1 text-black">
               비슷한 상품 찾기 <span class="material-symbols-outlined text-xs">open_in_new</span>

@@ -9,12 +9,36 @@ const MATCH_SCHEMA = Object.freeze({
   required: ['name', 'x', 'y'],
 });
 
+const EDIT_REGION_SCHEMA = Object.freeze({
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    x: { type: 'integer', minimum: 0, maximum: 100 },
+    y: { type: 'integer', minimum: 0, maximum: 100 },
+    width: { type: 'integer', minimum: 1, maximum: 100 },
+    height: { type: 'integer', minimum: 1, maximum: 100 },
+  },
+  required: ['x', 'y', 'width', 'height'],
+});
+
+const RECOMMENDATION_ITEM_TYPES = Object.freeze([
+  'clothing',
+  'bag',
+  'belt',
+  'shoes',
+  'watch',
+  'fashion-accessory',
+  'unsupported-accessory',
+]);
+
 const WORST_MATCH_SCHEMA = Object.freeze({
   ...MATCH_SCHEMA,
   properties: {
     ...MATCH_SCHEMA.properties,
     recommendItem: { type: 'string' },
     recommendReason: { type: 'string' },
+    itemType: { type: 'string', enum: RECOMMENDATION_ITEM_TYPES },
+    editRegion: EDIT_REGION_SCHEMA,
     reasonTags: {
       type: 'array',
       items: { type: 'string' },
@@ -22,7 +46,7 @@ const WORST_MATCH_SCHEMA = Object.freeze({
       maxItems: 3,
     },
   },
-  required: [...MATCH_SCHEMA.required, 'recommendItem', 'recommendReason', 'reasonTags'],
+  required: [...MATCH_SCHEMA.required, 'recommendItem', 'recommendReason', 'itemType', 'editRegion', 'reasonTags'],
 });
 
 export const OUTFIT_RESULT_SCHEMA = Object.freeze({
@@ -99,6 +123,15 @@ function normalizeOutfitResult(result, tpo) {
       normalized.recommendItem = cleanText(match.recommendItem);
       normalized.recommendReason = cleanText(match.recommendReason)
         || `${normalized.recommendItem} 하나면 코디 밸런스가 제자리로 돌아옵니다. 패션 구조대 출동 완료!`;
+      normalized.itemType = RECOMMENDATION_ITEM_TYPES.includes(match.itemType)
+        ? match.itemType
+        : 'clothing';
+      normalized.editRegion = {
+        x: boundedInteger(match.editRegion?.x, 0, 100),
+        y: boundedInteger(match.editRegion?.y, 0, 100),
+        width: boundedInteger(match.editRegion?.width, 1, 100),
+        height: boundedInteger(match.editRegion?.height, 1, 100),
+      };
       const tags = Array.isArray(match.reasonTags)
         ? match.reasonTags.map(cleanText).filter(Boolean).slice(0, 3)
         : [];
@@ -148,6 +181,12 @@ function validateOutfitResult(result, { requireEditDecision = false } = {}) {
     && (!withRecommendation || (
       isNonEmptyText(value.recommendItem)
       && isNonEmptyText(value.recommendReason)
+      && RECOMMENDATION_ITEM_TYPES.includes(value.itemType)
+      && value.editRegion
+      && isIntegerInRange(value.editRegion.x, 0, 100)
+      && isIntegerInRange(value.editRegion.y, 0, 100)
+      && isIntegerInRange(value.editRegion.width, 1, 100)
+      && isIntegerInRange(value.editRegion.height, 1, 100)
     ));
   const stats = result?.stats && Object.entries(result.stats);
 

@@ -42,6 +42,8 @@ const MAX_ANALYSIS_IMAGE_DIMENSION = 1600;
 const ALLOWED_UPLOAD_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const RECENT_RESULTS_KEY = 'fitcheck.recentResults.v1';
 const APP_RUNTIME = import.meta.env.VITE_APP_RUNTIME === 'toss' ? 'toss' : 'web';
+const BLOCKED_STYLE_EDIT_PATTERN = /(귀걸이|이어링|earrings?|반지|손가락\s*링|finger\s*ring|피어싱|piercings?)/i;
+const EDITABLE_STYLE_ITEM_TYPES = new Set(['clothing', 'bag', 'belt', 'shoes', 'watch', 'fashion-accessory']);
 
 // 2. DOM 요소 셀렉터
 const dom = {
@@ -91,6 +93,7 @@ const dom = {
   tooltipRecommendItem: document.getElementById('tooltip-recommend-item'),
   tooltipReasonTags: document.getElementById('tooltip-reason-tags'),
   tooltipRecommendReason: document.getElementById('tooltip-recommend-reason'),
+  styleEditPolicyNote: document.getElementById('style-edit-policy-note'),
   btnNextImprovement: document.getElementById('btn-next-improvement'),
   btnCloseTooltip: document.getElementById('btn-close-tooltip'),
   linkShopping: document.getElementById('link-shopping'),
@@ -726,6 +729,7 @@ function showPinTooltip(type, index = 0) {
     dom.tooltipContent.textContent = state.bestMatches[index].name;
     dom.tooltipStep.classList.add('hidden');
     dom.tooltipRecommendation.classList.add('hidden');
+    dom.styleEditPolicyNote.classList.add('hidden');
     
     // Angel은 쇼핑몰 추천 및 코디적용 숨김
     dom.linkShopping.classList.add('hidden');
@@ -762,10 +766,15 @@ function showPinTooltip(type, index = 0) {
     state.targetMusinsaUrl = `https://www.musinsa.com/search/goods?keyword=${query}`;
     dom.linkShopping.href = state.targetMusinsaUrl;
     dom.linkShopping.dataset.itemName = state.targetMusinsaItem;
+    const styleEditSupported = isStyleEditSupported(selectedMatch);
+    dom.styleEditPolicyNote.textContent = styleEditSupported
+      ? ''
+      : `${selectedMatch.recommendItem}은(는) 얼굴·손 주변을 보호하기 위해 사진 적용 대신 비슷한 상품 찾기만 지원해요.`;
+    dom.styleEditPolicyNote.classList.toggle('hidden', styleEditSupported);
 
     // 가상 적용 전에도 실제 상품을 먼저 둘러보거나 코디 적용을 선택할 수 있다.
     dom.linkShopping.classList.remove('hidden');
-    if (state.isPatched) {
+    if (state.isPatched || !styleEditSupported) {
       dom.btnApplyAdvice.classList.add('hidden'); // 이미 적용되었으면 감춤
     } else {
       dom.btnApplyAdvice.classList.remove('hidden');
@@ -848,15 +857,24 @@ function animateInlineScore(from, to) {
 async function applyStyleAdvice() {
   if (state.isPatched) return;
 
+  const selectedMatch = state.worstMatch;
+  if (!isStyleEditSupported(selectedMatch)) {
+    showToast('귀걸이·반지·피어싱은 사진 적용 대신 비슷한 상품 찾기만 지원해요. 🛡️');
+    return;
+  }
+
   dom.btnApplyAdvice.disabled = true;
   const appliedMatchIndex = state.selectedWorstMatchIndex;
   const recommendItemName = state.targetMusinsaItem || "독일군 스니커즈";
+  const originalImage = state.originalOotdImage || state.currentOotdImage;
   const previousScore = state.score;
   const previousStats = new Map(state.stats.map((stat) => [stat.name, stat.val]));
   const finishLoading = startInlineStyleEdit(recommendItemName);
+  let acceptedImage;
+  let acceptedAnalysis;
 
   try {
-    const preparedImage = await prepareImageForStyleEdit(state.currentOotdImage);
+    const preparedImage = await prepareImageForStyleEdit(originalImage);
     const response = await fetch('/api/apply-style', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -866,6 +884,8 @@ async function applyStyleAdvice() {
         height: preparedImage.originalHeight,
         recommendation: state.targetMusinsaItem,
         feedback: state.worstMatch?.name || '',
+        itemType: selectedMatch.itemType,
+        editRegion: selectedMatch.editRegion,
       }),
     });
     const payload = await response.json().catch(() => ({}));
@@ -876,49 +896,53 @@ async function applyStyleAdvice() {
       );
     }
 
-    const resultImage = state.isBattleMode ? dom.resultOotdImgChallenger : dom.resultOotdImg;
-    resultImage.src = payload.image;
-    await resultImage.decode();
-    state.originalOotdImage ||= state.currentOotdImage;
-    state.improvedOotdImage = payload.image;
-    state.currentOotdImage = payload.image;
-
-    dom.styleEditStatus.textContent = '새 코디 패션력과 스탯 다시 측정 중...';
-    try {
-      const analysis = await callAnalyzeAPI(
-        payload.image,
-        state.selectedTpo,
-        { item: recommendItemName, previousScore },
-        state.originalOotdImage,
-      );
-      if (analysis.editAccepted === false) {
-        throw new ApiRequestError(
-          'STYLE_EDIT_REJECTED',
-          '원본과 다른 부분이 너무 많이 바뀌어 이번 개선은 적용하지 않았어요. 다른 개선 포인트로 시도해 주세요.',
-        );
-      }
-      applyImprovedAnalysis(analysis, previousStats);
-      renderImprovementChangeSummary(previousScore, recommendItemName);
-      updateAchievement();
-      saveRecentResult({ improved: true });
-      await animateInlineScore(previousScore, state.score);
-    } catch (analysisError) {
-      console.warn('Improved image analysis failed.', analysisError);
-      resultImage.src = state.originalOotdImage;
-      state.currentOotdImage = state.originalOotdImage;
-      state.improvedOotdImage = null;
+    const localizationCheck = await validateLocalizedStyleEdit(originalImage, payload.image, selectedMatch);
+    if (!localizationCheck.accepted) {
+      console.warn('Style edit changed too much outside the target region.', localizationCheck);
       throw new ApiRequestError(
-        'STYLE_RESULT_ANALYSIS_FAILED',
-        `${aiErrorMessage(analysisError)} 원본으로 되돌렸어요. 잠시 후 다시 개선해 주세요.`,
+        'STYLE_EDIT_REJECTED',
+        '추천 아이템 밖의 영역까지 달라져 이번 결과는 적용하지 않았어요. 다른 개선 포인트로 시도해 주세요.',
       );
     }
-    finishLoading();
+
+    dom.styleEditStatus.textContent = '새 코디 패션력과 스탯 다시 측정 중...';
+    acceptedAnalysis = await callAnalyzeAPI(
+      payload.image,
+      state.selectedTpo,
+      {
+        item: recommendItemName,
+        previousScore,
+        itemType: selectedMatch.itemType,
+        editRegion: selectedMatch.editRegion,
+      },
+      originalImage,
+    );
+    if (acceptedAnalysis.editAccepted === false) {
+      throw new ApiRequestError(
+        'STYLE_EDIT_REJECTED',
+        '추천 아이템 외의 모습이 달라져 이번 결과는 적용하지 않았어요. 다른 개선 포인트로 시도해 주세요.',
+      );
+    }
+    await decodeDataUrlImage(payload.image);
+    acceptedImage = payload.image;
   } catch (error) {
     finishLoading();
     showToast(aiErrorMessage(error));
     dom.btnApplyAdvice.disabled = false;
     return;
   }
+
+  const resultImage = state.isBattleMode ? dom.resultOotdImgChallenger : dom.resultOotdImg;
+  resultImage.src = acceptedImage;
+  state.originalOotdImage = originalImage;
+  state.improvedOotdImage = acceptedImage;
+  state.currentOotdImage = acceptedImage;
+  applyImprovedAnalysis(acceptedAnalysis, previousStats);
+  renderImprovementChangeSummary(previousScore, recommendItemName);
+  updateAchievement();
+  saveRecentResult({ improved: true });
+  await animateInlineScore(previousScore, state.score);
+  finishLoading();
 
   state.isPatched = true;
   dom.btnApplyAdvice.disabled = false;
@@ -1149,6 +1173,109 @@ async function prepareImageForStyleEdit(dataUrl) {
   };
 }
 
+function isStyleEditSupported(match) {
+  return Boolean(
+    match
+    && EDITABLE_STYLE_ITEM_TYPES.has(match.itemType)
+    && isEditRegionSafe(match.itemType, match.editRegion)
+    && !BLOCKED_STYLE_EDIT_PATTERN.test(match.recommendItem || ''),
+  );
+}
+
+function isEditRegionSafe(itemType, region) {
+  if (!region || !['x', 'y', 'width', 'height'].every((key) => Number.isFinite(Number(region[key])))) return false;
+  const limits = {
+    clothing: [90, 95, 7200],
+    bag: [60, 70, 3600],
+    belt: [80, 35, 2200],
+    shoes: [70, 45, 2600],
+    watch: [35, 35, 1000],
+    'fashion-accessory': [60, 60, 2600],
+  }[itemType];
+  return Boolean(
+    limits
+    && region.x >= 0 && region.x <= 100
+    && region.y >= 0 && region.y <= 100
+    && region.width >= 1 && region.width <= limits[0]
+    && region.height >= 1 && region.height <= limits[1]
+    && (region.width * region.height) <= limits[2]
+  );
+}
+
+async function validateLocalizedStyleEdit(originalDataUrl, candidateDataUrl, match) {
+  const [original, candidate] = await Promise.all([
+    decodeDataUrlImage(originalDataUrl),
+    decodeDataUrlImage(candidateDataUrl),
+  ]);
+  const sampleWidth = 192;
+  const sampleHeight = Math.max(128, Math.min(256, Math.round(sampleWidth * (original.naturalHeight / original.naturalWidth))));
+  const originalPixels = drawImagePixels(original, sampleWidth, sampleHeight);
+  const candidatePixels = drawImagePixels(candidate, sampleWidth, sampleHeight);
+  const region = match.editRegion;
+  const paddingX = 4;
+  const paddingY = 4;
+  const left = Math.max(0, region.x - (region.width / 2) - paddingX);
+  const right = Math.min(100, region.x + (region.width / 2) + paddingX);
+  const top = Math.max(0, region.y - (region.height / 2) - paddingY);
+  const bottom = Math.min(100, region.y + (region.height / 2) + paddingY);
+  let outsidePixels = 0;
+  let outsideChangedPixels = 0;
+  let outsideDeltaTotal = 0;
+  let insidePixels = 0;
+  let insideChangedPixels = 0;
+
+  for (let y = 0; y < sampleHeight; y += 1) {
+    for (let x = 0; x < sampleWidth; x += 1) {
+      const offset = ((y * sampleWidth) + x) * 4;
+      const delta = (
+        Math.abs(originalPixels[offset] - candidatePixels[offset])
+        + Math.abs(originalPixels[offset + 1] - candidatePixels[offset + 1])
+        + Math.abs(originalPixels[offset + 2] - candidatePixels[offset + 2])
+      ) / 3;
+      const xPercent = ((x + 0.5) / sampleWidth) * 100;
+      const yPercent = ((y + 0.5) / sampleHeight) * 100;
+      const insideTarget = xPercent >= left && xPercent <= right && yPercent >= top && yPercent <= bottom;
+
+      if (insideTarget) {
+        insidePixels += 1;
+        if (delta >= 28) insideChangedPixels += 1;
+      } else {
+        outsidePixels += 1;
+        outsideDeltaTotal += delta;
+        if (delta >= 32) outsideChangedPixels += 1;
+      }
+    }
+  }
+
+  const outsideChangedRatio = outsidePixels ? outsideChangedPixels / outsidePixels : 1;
+  const outsideMeanDelta = outsidePixels ? outsideDeltaTotal / outsidePixels : 255;
+  const insideChangedRatio = insidePixels ? insideChangedPixels / insidePixels : 0;
+  return {
+    accepted: outsideChangedRatio <= 0.16 && outsideMeanDelta <= 14 && insideChangedRatio >= 0.005,
+    outsideChangedRatio: Number(outsideChangedRatio.toFixed(4)),
+    outsideMeanDelta: Number(outsideMeanDelta.toFixed(2)),
+    insideChangedRatio: Number(insideChangedRatio.toFixed(4)),
+  };
+}
+
+async function decodeDataUrlImage(dataUrl) {
+  const image = new Image();
+  image.src = dataUrl;
+  await image.decode();
+  return image;
+}
+
+function drawImagePixels(image, width, height) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(image, 0, 0, width, height);
+  return context.getImageData(0, 0, width, height).data;
+}
+
 // 점수판 및 스탯 렌더링 총괄
 function renderResultDashboard() {
   // 점수 롤링 연출
@@ -1176,6 +1303,7 @@ function renderResultDashboard() {
   if (state.isBattleMode) {
     // 헤더 배지 변경 (전체 상태 표기)
     if (dom.resultHeaderBadge) {
+      dom.resultHeaderBadge.classList.remove('hidden');
       if (state.score > state.opponentScore) {
         dom.resultHeaderBadge.textContent = "VICTORY 🎉";
         dom.resultHeaderBadge.className = "bg-secondary border-[2px] border-black px-3 py-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-xs font-black rotate-[2deg] text-black";
@@ -1191,10 +1319,10 @@ function renderResultDashboard() {
       dom.resultRoastText.textContent = `🚨 배틀 패배! 상대방의 견고한 가치관이 깃든 핏(점수: ${state.opponentScore.toLocaleString()}점)에 가로막혀 당신의 OOTD가 대완패를 당했습니다. 추천 코드를 가상 장착하여 복수전을 시작하세요! 😈`;
     }
   } else {
-    // 헤더 배지 복원
+    // 내부 검수 문구는 사용자 결과 화면에 노출하지 않습니다.
     if (dom.resultHeaderBadge) {
-      dom.resultHeaderBadge.textContent = "QC PASSED ✅";
-      dom.resultHeaderBadge.className = "bg-secondary border-[2px] border-black px-3 py-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-xs font-bold rotate-[2deg] text-black";
+      dom.resultHeaderBadge.textContent = '';
+      dom.resultHeaderBadge.className = 'hidden';
     }
     dom.resultTopOverlayTag.textContent = state.score >= 7000 ? "VOGUE PASS" : "EMERGENCY";
     dom.resultRoastText.textContent = getRoastComment(state.selectedTpo, state.score, state.isPatched);
@@ -1498,8 +1626,8 @@ function resetToUploadScreen() {
     
     // 헤더 배지 복원
     if (dom.resultHeaderBadge) {
-      dom.resultHeaderBadge.textContent = "QC PASSED ✅";
-      dom.resultHeaderBadge.className = "bg-secondary border-[2px] border-black px-3 py-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-xs font-bold rotate-[2deg] text-black";
+      dom.resultHeaderBadge.textContent = '';
+      dom.resultHeaderBadge.className = 'hidden';
     }
     
     // 버튼 텍스트 복구
