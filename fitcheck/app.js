@@ -33,6 +33,7 @@ const state = {
   improvementChanges: [],
   achievement: null,
   currentRecordId: null,
+  selectedWorstMatchIndex: 0,
 };
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -83,10 +84,12 @@ const dom = {
   feedbackTooltip: document.getElementById('feedback-tooltip'),
   tooltipTitle: document.getElementById('tooltip-title'),
   tooltipContent: document.getElementById('tooltip-content'),
+  tooltipStep: document.getElementById('tooltip-step'),
   tooltipRecommendation: document.getElementById('tooltip-recommendation'),
   tooltipRecommendItem: document.getElementById('tooltip-recommend-item'),
   tooltipReasonTags: document.getElementById('tooltip-reason-tags'),
   tooltipRecommendReason: document.getElementById('tooltip-recommend-reason'),
+  btnNextImprovement: document.getElementById('btn-next-improvement'),
   btnCloseTooltip: document.getElementById('btn-close-tooltip'),
   linkShopping: document.getElementById('link-shopping'),
   btnApplyAdvice: document.getElementById('btn-apply-advice'),
@@ -236,6 +239,7 @@ function bindEvents() {
   dom.pinAngel.addEventListener('click', () => showPinTooltip('angel', 0));
   dom.pinDevil.addEventListener('click', () => showPinTooltip('devil', 0));
   dom.btnCloseTooltip.addEventListener('click', hideTooltip);
+  dom.btnNextImprovement.addEventListener('click', showNextImprovement);
 
   // 6. 추천 코디 적용 (Devil 피드백 교체)
   dom.btnApplyAdvice.addEventListener('click', applyStyleAdvice);
@@ -698,14 +702,19 @@ function showPinTooltip(type, index = 0) {
     dom.tooltipTitle.textContent = "😇 BEST MATCH";
     dom.tooltipTitle.className = "font-headline font-black text-xs uppercase px-2 py-0.5 border-[2px] border-black bg-secondary text-black";
     dom.tooltipContent.textContent = state.bestMatches[index].name;
+    dom.tooltipStep.classList.add('hidden');
     dom.tooltipRecommendation.classList.add('hidden');
     
     // Angel은 쇼핑몰 추천 및 코디적용 숨김
     dom.linkShopping.classList.add('hidden');
     dom.btnApplyAdvice.classList.add('hidden');
   } else {
-    dom.tooltipTitle.textContent = "😈 개선 포인트";
+    const totalMatches = state.worstMatches.length;
+    state.selectedWorstMatchIndex = index;
+    dom.tooltipTitle.textContent = index === 0 ? "😈 가장 먼저 고칠 곳" : "😈 또 다른 개선 포인트";
     dom.tooltipTitle.className = "font-headline font-black text-xs uppercase px-2 py-0.5 border-[2px] border-black bg-error-container text-black";
+    dom.tooltipStep.textContent = totalMatches > 1 ? `${index + 1} / ${totalMatches}` : '핵심 1개';
+    dom.tooltipStep.classList.remove('hidden');
     
     const selectedMatch = state.worstMatches[index];
     let comment = selectedMatch.name;
@@ -722,6 +731,10 @@ function showPinTooltip(type, index = 0) {
       dom.tooltipReasonTags.appendChild(chip);
     });
     dom.tooltipRecommendation.classList.remove('hidden');
+    dom.btnNextImprovement.classList.toggle('hidden', totalMatches < 2);
+    dom.btnNextImprovement.textContent = index === totalMatches - 1
+      ? '첫 개선 포인트로 돌아가기 ↺'
+      : '다음 개선 포인트 보기 →';
     state.worstMatch = selectedMatch;
     state.targetMusinsaItem = selectedMatch.recommendItem;
     state.targetMusinsaUrl = `https://www.musinsa.com/search/goods?keyword=${query}`;
@@ -749,6 +762,13 @@ function hideTooltip() {
   document.querySelectorAll('[data-pin-type]').forEach((pin) => {
     pin.classList.remove('pin-selected');
   });
+}
+
+function showNextImprovement() {
+  const totalMatches = state.worstMatches?.length || 0;
+  if (totalMatches < 2) return;
+  const nextIndex = (state.selectedWorstMatchIndex + 1) % totalMatches;
+  showPinTooltip('devil', nextIndex);
 }
 
 
@@ -1375,6 +1395,7 @@ function resetToUploadScreen() {
   state.improvementChanges = [];
   state.achievement = null;
   state.currentRecordId = null;
+  state.selectedWorstMatchIndex = 0;
   dom.imageVersionToggle.classList.add('hidden');
   dom.improvedShoppingCard.classList.add('hidden');
   dom.improvementChangeSummary.classList.add('hidden');
