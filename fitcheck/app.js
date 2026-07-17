@@ -41,6 +41,7 @@ const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const MAX_ANALYSIS_IMAGE_DIMENSION = 1600;
 const ALLOWED_UPLOAD_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const RECENT_RESULTS_KEY = 'fitcheck.recentResults.v1';
+const APP_RUNTIME = import.meta.env.VITE_APP_RUNTIME === 'toss' ? 'toss' : 'web';
 
 // 2. DOM 요소 셀렉터
 const dom = {
@@ -269,18 +270,8 @@ function bindEvents() {
     dom.btnOpenInstagramApp.addEventListener('click', openInstagramApp);
   }
 
-  // 11. 무신사 리다이렉션 컨펌 모달 연동
-  if (dom.linkShopping) {
-    dom.linkShopping.addEventListener('click', (e) => {
-      e.preventDefault();
-      if (dom.musinsaItemName) {
-        dom.musinsaItemName.textContent = state.targetMusinsaItem;
-      }
-      if (dom.musinsaRedirectModal) {
-        dom.musinsaRedirectModal.classList.remove('hidden');
-      }
-    });
-  }
+  // 11. 쇼핑 링크: 웹은 바로 이동하고, 토스 WebView에서만 이탈 확인을 거칩니다.
+  document.addEventListener('click', handleShoppingLinkClick);
   if (dom.btnCloseMusinsaModal) {
     dom.btnCloseMusinsaModal.addEventListener('click', () => {
       dom.musinsaRedirectModal.classList.add('hidden');
@@ -293,7 +284,7 @@ function bindEvents() {
   }
   if (dom.btnConfirmMusinsaRedirect) {
     dom.btnConfirmMusinsaRedirect.addEventListener('click', () => {
-      window.open(state.targetMusinsaUrl, '_blank', 'noopener,noreferrer');
+      openExternalShoppingUrl(state.targetMusinsaUrl);
       dom.musinsaRedirectModal.classList.add('hidden');
     });
   }
@@ -352,6 +343,24 @@ async function handleCustomFileUpload(e) {
     console.warn('Image upload validation failed.', error);
     rejectImageUpload('사진을 읽을 수 없어요. 손상되지 않은 다른 사진을 선택해 주세요. 🧩');
   }
+}
+
+function handleShoppingLinkClick(event) {
+  const link = event.target instanceof Element
+    ? event.target.closest('[data-shopping-link="true"]')
+    : null;
+  if (!link || APP_RUNTIME !== 'toss') return;
+
+  event.preventDefault();
+  state.targetMusinsaUrl = link.href;
+  state.targetMusinsaItem = link.dataset.itemName || '추천 아이템';
+  dom.musinsaItemName.textContent = state.targetMusinsaItem;
+  dom.musinsaRedirectModal.classList.remove('hidden');
+}
+
+function openExternalShoppingUrl(url) {
+  if (!url) return;
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 async function trySampleExperience() {
@@ -745,7 +754,8 @@ function showPinTooltip(type, index = 0) {
     state.worstMatch = selectedMatch;
     state.targetMusinsaItem = selectedMatch.recommendItem;
     state.targetMusinsaUrl = `https://www.musinsa.com/search/goods?keyword=${query}`;
-    dom.linkShopping.href = "#";
+    dom.linkShopping.href = state.targetMusinsaUrl;
+    dom.linkShopping.dataset.itemName = state.targetMusinsaItem;
 
     // 가상 적용 전에도 실제 상품을 먼저 둘러보거나 코디 적용을 선택할 수 있다.
     dom.linkShopping.classList.remove('hidden');
@@ -915,6 +925,7 @@ async function applyStyleAdvice() {
   dom.improvedShoppingDescription.textContent = state.apiData?.improvementSummary
     || `${recommendItemName}(으)로 갈아입혀 ${state.selectedTpo} 무드와 전체 밸런스가 한층 또렷해졌어요. 문제 아이템은 퇴근 완료!`;
   dom.improvedShoppingLink.href = `https://www.musinsa.com/search/goods?keyword=${encodeURIComponent(recommendItemName)}`;
+  dom.improvedShoppingLink.dataset.itemName = recommendItemName;
   dom.improvedShoppingCard.classList.remove('hidden');
   renderRemainingRecommendations(appliedMatchIndex);
   dom.pinInteractionGuide.classList.add('hidden');

@@ -28,9 +28,12 @@ npx wrangler pages dev dist --ai AI
 - Workers AI binding: `AI`
 - Optional variable: `AI_OUTFIT_ANALYSIS_MODEL=gemini-3.1-flash-lite`
 - Optional variable: `AI_STYLE_EDIT_MODEL=@cf/black-forest-labs/flux-2-klein-4b`
+- Public build variable: `VITE_APP_RUNTIME=web` (Toss mini-app build: `toss`)
 - Pages Functions: 저장소 루트의 `functions/`
 
-API 키를 코드 또는 `VITE_` 환경 변수에 넣지 마세요. 배포 환경에서는 암호화된 `GEMINI_API_KEY` Secret만 사용합니다.
+API 키를 코드 또는 `VITE_` 환경 변수에 넣지 마세요. 배포 환경에서는 암호화된 `GEMINI_API_KEY` Secret만 사용합니다. `VITE_APP_RUNTIME`은 비밀값이 아닌 화면 동작 구분용 공개 설정입니다.
+
+일반 웹 빌드는 쇼핑 링크를 새 탭으로 바로 엽니다. `VITE_APP_RUNTIME=toss` 빌드는 WebView 이탈 확인창을 먼저 보여줍니다. 토스 SDK를 프로젝트에 연결하는 단계에서는 외부 이동 어댑터를 공식 `@apps-in-toss/web-framework`의 `openURL` 호출로 교체하면 됩니다.
 
 ## AI 모델 확장
 
