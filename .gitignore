@@ -12,3 +12,5 @@ fitcheck.zip
 # Test folder
 test-gemini-image/
 
+.granite
+*.ait
