@@ -8,3 +8,9 @@ dist/
 .DS_Store
 Thumbs.db
 fitcheck.zip
+
+# Test folder
+test-gemini-image/
+
+.granite
+*.ait
