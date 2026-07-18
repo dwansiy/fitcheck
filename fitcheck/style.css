@@ -63,8 +63,7 @@ button.neo-shadow:active:not(:disabled),
 
 /* 예외 사항: 엔젤/데빌 핀 및 아바타 서클만 원형 유지 */
 .rounded-full, 
-#pin-angel, 
-#pin-devil, 
+.anchor-dot,
 .viewfinder-tech-overlay,
 #app-toast {
   border-radius: 9999px !important;
@@ -148,26 +147,69 @@ section.active-screen {
   display: none !important;
 }
 
-/* 10. Neo-Brutalist Pin Pulse (그림자 맥박 애니메이션으로 인지 가능성 비약적 향상) */
-@keyframes neo-pin-pulse {
-  0%, 100% {
-    box-shadow: 1px 1px 0 0 #000000;
-    transform: scale(1);
-  }
-  50% {
-    box-shadow: 1px 1px 0 0 #000000;
-    transform: scale(1.04);
-  }
+/* 10. 이미지 좌표와 연결되는 좌우 마진 태그 */
+.margin-tag {
+  border-radius: 4px !important;
+  max-width: 42%;
+  padding: 6px 10px !important;
+  overflow: hidden;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(0, 0, 0, 0.55) !important;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
 
-[data-pin-type] {
-  animation: neo-pin-pulse 2.2s infinite ease-in-out;
-  border-width: 2px !important;
-  box-sizing: border-box;
+.margin-tag:hover,
+.margin-tag.active-tag {
+  transform: scale(1.05) !important;
+  background: rgba(0, 0, 0, 0.82) !important;
 }
 
-[data-pin-type].pin-selected {
+.margin-tag-angel.active-tag { border-color: #4ade80 !important; color: #4ade80; }
+.margin-tag-devil.active-tag { border-color: #f87171 !important; color: #f87171; }
+
+.anchor-dot {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 1.5px solid #fff !important;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.55) !important;
+  z-index: 30;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  animation: neo-anchor-pulse 2s infinite ease-in-out;
+}
+
+.anchor-dot:hover,
+.anchor-dot.active-dot {
   animation: none;
-  transform: scale(1.12) rotate(-5deg);
-  box-shadow: 2px 2px 0 0 #000000;
+  transform: translate(-50%, -50%) scale(1.5);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.7) !important;
 }
+
+.anchor-dot-angel { background-color: #4ade80 !important; }
+.anchor-dot-devil { background-color: #f87171 !important; }
+
+@keyframes neo-anchor-pulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+  50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+}
+
+.tag-connection-line {
+  stroke: #fff;
+  stroke-width: 1.2;
+  opacity: 0.55;
+  transition: opacity 0.2s ease, stroke-width 0.2s ease;
+}
+
+.tag-connection-line.active-line { stroke-width: 2.2; opacity: 1; }
+.tag-connection-line-angel.active-line { stroke: #4ade80; }
+.tag-connection-line-devil.active-line { stroke: #f87171; }

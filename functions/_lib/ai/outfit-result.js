@@ -3,10 +3,11 @@ const MATCH_SCHEMA = Object.freeze({
   additionalProperties: false,
   properties: {
     name: { type: 'string' },
+    keyword: { type: 'string' },
     x: { type: 'integer', minimum: 0, maximum: 100 },
     y: { type: 'integer', minimum: 0, maximum: 100 },
   },
-  required: ['name', 'x', 'y'],
+  required: ['name', 'keyword', 'x', 'y'],
 });
 
 const EDIT_REGION_SCHEMA = Object.freeze({
@@ -114,8 +115,21 @@ function normalizeOutfitResult(result, tpo) {
 
   const normalizeMatch = (match, withRecommendation = false) => {
     if (!match || typeof match !== 'object') return null;
+
+    const name = cleanText(match.name);
+    let keyword = cleanText(match.keyword);
+    if (!keyword && name) {
+      const namePart = cleanText(name.split(':')[0]);
+      const words = namePart.split(/\s+/);
+      keyword = words.slice(-2).join(' ') || namePart;
+    }
+    if (!keyword) {
+      keyword = withRecommendation ? '추천 아이템' : '베스트 아이템';
+    }
+
     const normalized = {
-      name: cleanText(match.name),
+      name,
+      keyword,
       x: boundedInteger(match.x, 0, 100),
       y: boundedInteger(match.y, 0, 100),
     };
@@ -176,6 +190,7 @@ function validateOutfitResult(result, { requireEditDecision = false } = {}) {
   const isNonEmptyText = (value) => typeof value === 'string' && value.trim().length > 0;
   const isMatch = (value, withRecommendation = false) => value
     && isNonEmptyText(value.name)
+    && isNonEmptyText(value.keyword)
     && isIntegerInRange(value.x, 0, 100)
     && isIntegerInRange(value.y, 0, 100)
     && (!withRecommendation || (

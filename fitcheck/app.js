@@ -34,6 +34,8 @@ const state = {
   achievement: null,
   currentRecordId: null,
   selectedWorstMatchIndex: 0,
+  shareImageDataUrl: null,
+  shareImageFile: null,
 };
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -81,8 +83,8 @@ const dom = {
   // 결과 화면
   resultOotdImg: document.getElementById('result-ootd-img'),
   resultTopOverlayTag: document.getElementById('result-top-overlay-tag'),
-  pinAngel: document.getElementById('pin-angel'),
-  pinDevil: document.getElementById('pin-devil'),
+  tagContainer: document.getElementById('tag-container'),
+  tagLinesSvg: document.getElementById('tag-lines-svg'),
   feedbackTooltip: document.getElementById('feedback-tooltip'),
   tooltipTitle: document.getElementById('tooltip-title'),
   tooltipContent: document.getElementById('tooltip-content'),
@@ -132,6 +134,8 @@ const dom = {
   instagramRedirectModal: document.getElementById('instagram-redirect-modal'),
   btnCloseRedirectModal: document.getElementById('btn-close-redirect-modal'),
   btnOpenInstagramApp: document.getElementById('btn-open-instagram-app'),
+  btnShareSystem: document.getElementById('btn-share-system'),
+  btnDownloadImage: document.getElementById('btn-download-image'),
   instagramPreviewImg: document.getElementById('instagram-preview-img'),
 
   // 배틀 모드 관련 추가 DOM
@@ -234,9 +238,8 @@ function bindEvents() {
   // 4. 패션력 측정하기 실행
   dom.btnSubmitScan.addEventListener('click', startScanningSequence);
 
-  // 5. 결과창 Angel/Devil 마커 클릭
-  dom.pinAngel.addEventListener('click', () => showPinTooltip('angel', 0));
-  dom.pinDevil.addEventListener('click', () => showPinTooltip('devil', 0));
+  // 5. 결과창 마진 태그 연결선 갱신
+  window.addEventListener('resize', drawLines);
   dom.btnCloseTooltip.addEventListener('click', hideTooltip);
   dom.btnNextImprovement.addEventListener('click', showNextImprovement);
 
@@ -263,6 +266,12 @@ function bindEvents() {
   }
   if (dom.btnOpenInstagramApp) {
     dom.btnOpenInstagramApp.addEventListener('click', openInstagramApp);
+  }
+  if (dom.btnShareSystem) {
+    dom.btnShareSystem.addEventListener('click', shareSystem);
+  }
+  if (dom.btnDownloadImage) {
+    dom.btnDownloadImage.addEventListener('click', downloadShareImage);
   }
 
 }
@@ -581,9 +590,9 @@ function calculateFashionResults() {
     dom.battleVersusContainer.classList.remove('hidden');
     dom.resultOotdImgChallenger.src = state.currentOotdImage;
     
-    // 핀 마커 및 툴팁 감춤
-    dom.pinAngel.classList.add('hidden');
-    dom.pinDevil.classList.add('hidden');
+    // 마진 태그 및 툴팁 감춤
+    dom.tagContainer.classList.add('hidden');
+    dom.tagLinesSvg.classList.add('hidden');
     dom.feedbackTooltip.classList.add('hidden');
     if (dom.resultTopOverlayBadge) dom.resultTopOverlayBadge.classList.add('hidden');
     if (dom.pinInteractionGuide) dom.pinInteractionGuide.classList.add('hidden');
@@ -620,7 +629,7 @@ function calculateFashionResults() {
     dom.battleVersusContainer.classList.add('hidden');
     dom.resultOotdImg.src = state.currentOotdImage;
     
-    // Angel & Devil 핀 배치 및 내용 세팅
+    // Angel & Devil 마진 태그 배치
     setupPins();
     if (dom.resultTopOverlayBadge) dom.resultTopOverlayBadge.classList.remove('hidden');
     if (dom.pinInteractionGuide) dom.pinInteractionGuide.classList.remove('hidden');
@@ -630,33 +639,122 @@ function calculateFashionResults() {
   renderResultDashboard();
 }
 
-// 핀 마커 포지셔닝 및 코디 세팅
+// 좌우 마진 태그와 이미지 좌표 연결선 렌더링
 function setupPins() {
   dom.feedbackTooltip.classList.add('hidden');
-  document.querySelectorAll('.dynamic-fit-pin').forEach((pin) => pin.remove());
-  renderMatchPins('angel', state.bestMatches, dom.pinAngel, '😇', 'bg-white');
-  renderMatchPins('devil', state.worstMatches, dom.pinDevil, '😈', 'bg-error-container');
-  dom.pinInteractionText.textContent = '사진 속 😇·😈 핀을 직접 눌러도 확인할 수 있어요.';
+  dom.tagContainer.textContent = '';
+  dom.tagLinesSvg.textContent = '';
+
+  const leftTags = [];
+  const rightTags = [];
+  const collect = (matches, type) => {
+    (matches || []).forEach((match, originalIndex) => {
+      const tag = { ...match, type, originalIndex };
+      (match.x < 50 ? leftTags : rightTags).push(tag);
+    });
+  };
+  collect(state.bestMatches, 'angel');
+  collect(state.worstMatches, 'devil');
+  spaceOutTags(leftTags);
+  spaceOutTags(rightTags);
+
+  const renderTagsForSide = (tags, side) => {
+    tags.forEach((tag) => {
+      const dot = document.createElement('button');
+      dot.type = 'button';
+      dot.className = `anchor-dot anchor-dot-${tag.type} absolute pointer-events-auto`;
+      dot.style.left = `${tag.x}%`;
+      dot.style.top = `${tag.y}%`;
+      dot.dataset.type = tag.type;
+      dot.dataset.index = String(tag.originalIndex);
+      dot.setAttribute('aria-label', tag.type === 'angel' ? '베스트 아이템 설명 열기' : '개선 아이템 설명 열기');
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `margin-tag margin-tag-${tag.type} absolute pointer-events-auto flex items-center justify-center gap-1`;
+      button.style.top = `${tag.displayY}%`;
+      button.style[side] = '4%';
+      button.dataset.type = tag.type;
+      button.dataset.index = String(tag.originalIndex);
+
+      const emoji = document.createElement('span');
+      emoji.textContent = tag.type === 'angel' ? '😇' : '😈';
+      const keyword = document.createElement('span');
+      keyword.className = 'font-sans font-black';
+      keyword.textContent = tag.keyword || tag.name.split(':')[0];
+      button.append(emoji, keyword);
+
+      const selectTag = () => showPinTooltip(tag.type, tag.originalIndex);
+      button.addEventListener('click', selectTag);
+      dot.addEventListener('click', selectTag);
+
+      const setHover = (active) => {
+        const line = dom.tagLinesSvg.querySelector(`[data-tag-line="${tag.type}-${tag.originalIndex}"]`);
+        if (active) {
+          line?.classList.add('active-line');
+          button.classList.add('active-tag');
+          dot.classList.add('active-dot');
+        } else if (!button.classList.contains('is-selected-active')) {
+          if (!line?.classList.contains('is-selected-active-line')) line?.classList.remove('active-line');
+          button.classList.remove('active-tag');
+          dot.classList.remove('active-dot');
+        }
+      };
+      button.addEventListener('mouseenter', () => setHover(true));
+      button.addEventListener('mouseleave', () => setHover(false));
+      dot.addEventListener('mouseenter', () => setHover(true));
+      dot.addEventListener('mouseleave', () => setHover(false));
+
+      dom.tagContainer.append(dot, button);
+    });
+  };
+
+  renderTagsForSide(leftTags, 'left');
+  renderTagsForSide(rightTags, 'right');
+  dom.tagContainer.classList.remove('hidden');
+  dom.tagLinesSvg.classList.remove('hidden');
+  dom.pinInteractionText.textContent = '의상 태그를 탭해 😇 베스트와 😈 개선 포인트를 확인해 보세요.';
+  setTimeout(drawLines, 50);
 }
 
-function renderMatchPins(type, matches, basePin, emoji, backgroundClass) {
-  matches.forEach((match, index) => {
-    const pin = index === 0 ? basePin : basePin.cloneNode(true);
-    pin.className = `absolute ${backgroundClass} border-2 border-black rounded-full shadow-[1px_1px_0px_0px_#000] z-20 cursor-pointer transition-all flex items-center justify-center w-7 h-7 text-sm ${index ? 'dynamic-fit-pin' : ''}`;
-    pin.style.top = `${match.y}%`;
-    pin.style.left = `${match.x}%`;
-    pin.dataset.pinType = type;
-    pin.dataset.pinIndex = String(index);
-    pin.setAttribute('role', 'button');
-    pin.setAttribute('tabindex', '0');
-    pin.setAttribute('aria-label', type === 'devil' ? '개선 포인트 열기' : '베스트 포인트 열기');
-    pin.querySelector('span').textContent = emoji;
-    pin.classList.remove('hidden');
-    if (index > 0) {
-      pin.removeAttribute('id');
-      pin.addEventListener('click', () => showPinTooltip(type, index));
-      basePin.parentElement.appendChild(pin);
+function spaceOutTags(tags) {
+  if (!tags.length) return;
+  tags.sort((left, right) => left.y - right.y);
+  tags.forEach((tag) => { tag.displayY = tag.y; });
+  const minimumGap = 12;
+  for (let index = 1; index < tags.length; index += 1) {
+    tags[index].displayY = Math.max(tags[index].displayY, tags[index - 1].displayY + minimumGap);
+  }
+  const overflow = Math.max(0, tags.at(-1).displayY - 90);
+  for (let index = tags.length - 1; index >= 0; index -= 1) {
+    tags[index].displayY = Math.max(5, tags[index].displayY - overflow);
+    if (index < tags.length - 1) {
+      tags[index].displayY = Math.min(tags[index].displayY, tags[index + 1].displayY - minimumGap);
     }
+  }
+}
+
+function drawLines() {
+  if (!dom.tagContainer || dom.tagContainer.classList.contains('hidden')) return;
+  dom.tagLinesSvg.textContent = '';
+  const containerRect = dom.tagContainer.getBoundingClientRect();
+  if (!containerRect.width || !containerRect.height) return;
+
+  const dots = Array.from(dom.tagContainer.querySelectorAll('.anchor-dot'));
+  dom.tagContainer.querySelectorAll('.margin-tag').forEach((button) => {
+    const dot = dots.find((item) => item.dataset.type === button.dataset.type && item.dataset.index === button.dataset.index);
+    if (!dot) return;
+    const buttonRect = button.getBoundingClientRect();
+    const dotRect = dot.getBoundingClientRect();
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', button.style.left ? buttonRect.right - containerRect.left : buttonRect.left - containerRect.left);
+    line.setAttribute('y1', buttonRect.top + (buttonRect.height / 2) - containerRect.top);
+    line.setAttribute('x2', dotRect.left + (dotRect.width / 2) - containerRect.left);
+    line.setAttribute('y2', dotRect.top + (dotRect.height / 2) - containerRect.top);
+    const active = button.classList.contains('active-tag');
+    line.setAttribute('class', `tag-connection-line tag-connection-line-${button.dataset.type}${active ? ' active-line is-selected-active-line' : ''}`);
+    line.dataset.tagLine = `${button.dataset.type}-${button.dataset.index}`;
+    dom.tagLinesSvg.appendChild(line);
   });
 }
 
@@ -667,11 +765,18 @@ function showPinTooltip(type, index = 0) {
   void dom.feedbackTooltip.offsetWidth;
   dom.feedbackTooltip.classList.add('tooltip-reveal');
   playSound('select');
-  document.querySelectorAll('[data-pin-type]').forEach((pin) => {
-    pin.classList.remove('pin-selected');
+  dom.tagContainer.querySelectorAll('.margin-tag, .anchor-dot').forEach((element) => {
+    element.classList.remove('active-tag', 'active-dot', 'is-selected-active');
   });
-  document.querySelector(`[data-pin-type="${type}"][data-pin-index="${index}"]`)
-    ?.classList.add('pin-selected');
+  dom.tagLinesSvg.querySelectorAll('.tag-connection-line').forEach((line) => {
+    line.classList.remove('active-line', 'is-selected-active-line');
+  });
+  const selectedTag = dom.tagContainer.querySelector(`.margin-tag[data-type="${type}"][data-index="${index}"]`);
+  const selectedDot = dom.tagContainer.querySelector(`.anchor-dot[data-type="${type}"][data-index="${index}"]`);
+  const selectedLine = dom.tagLinesSvg.querySelector(`[data-tag-line="${type}-${index}"]`);
+  selectedTag?.classList.add('active-tag', 'is-selected-active');
+  selectedDot?.classList.add('active-dot', 'is-selected-active');
+  selectedLine?.classList.add('active-line', 'is-selected-active-line');
 
   if (type === 'angel') {
     dom.tooltipTitle.textContent = "😇 BEST MATCH";
@@ -739,8 +844,11 @@ function showPinTooltip(type, index = 0) {
 
 function hideTooltip() {
   dom.feedbackTooltip.classList.add('hidden');
-  document.querySelectorAll('[data-pin-type]').forEach((pin) => {
-    pin.classList.remove('pin-selected');
+  dom.tagContainer.querySelectorAll('.margin-tag, .anchor-dot').forEach((element) => {
+    element.classList.remove('active-tag', 'active-dot', 'is-selected-active');
+  });
+  dom.tagLinesSvg.querySelectorAll('.tag-connection-line').forEach((line) => {
+    line.classList.remove('active-line', 'is-selected-active-line');
   });
 }
 
@@ -896,14 +1004,14 @@ async function applyStyleAdvice() {
   dom.btnApplyAdvice.disabled = false;
   hideTooltip();
   playSound('upgrade');
-  document.querySelectorAll('[data-pin-type]').forEach((pin) => pin.classList.add('hidden'));
+  dom.tagContainer.classList.add('hidden');
+  dom.tagLinesSvg.classList.add('hidden');
   dom.resultTopOverlayTag.textContent = '개선 이미지';
   dom.imageVersionToggle.classList.remove('hidden');
   dom.improvedShoppingItem.textContent = recommendItemName;
   dom.improvedShoppingDescription.textContent = state.apiData?.improvementSummary
     || `${recommendItemName}(으)로 갈아입혀 ${state.selectedTpo} 무드와 전체 밸런스가 한층 또렷해졌어요. 문제 아이템은 퇴근 완료!`;
   dom.improvedShoppingLink.href = `https://www.musinsa.com/search/goods?keyword=${encodeURIComponent(recommendItemName)}`;
-  dom.improvedShoppingLink.dataset.itemName = recommendItemName;
   dom.improvedShoppingCard.classList.remove('hidden');
   renderRemainingRecommendations(appliedMatchIndex);
   dom.pinInteractionGuide.classList.add('hidden');
@@ -1532,6 +1640,8 @@ function resetToUploadScreen() {
   state.achievement = null;
   state.currentRecordId = null;
   state.selectedWorstMatchIndex = 0;
+  state.shareImageDataUrl = null;
+  state.shareImageFile = null;
   dom.imageVersionToggle.classList.add('hidden');
   dom.improvedShoppingCard.classList.add('hidden');
   dom.improvementChangeSummary.classList.add('hidden');
@@ -1546,10 +1656,11 @@ function resetToUploadScreen() {
   dom.sampleTipText.textContent = '사진을 고르기 전에 결과 화면을 가볍게 구경해 보세요.';
   dom.sampleTipCard.classList.remove('hidden');
   
-  // 핀 복원 및 클릭 리스너 청소
-  dom.pinDevil.classList.remove('hidden');
-  dom.pinDevil.querySelector('span').textContent = "😈";
-  dom.pinDevil.className = "absolute bg-error-container border-2 border-black rounded-full shadow-[1px_1px_0px_0px_#000] z-20 cursor-pointer text-sm transition-all flex items-center justify-center w-7 h-7";
+  // 마진 태그 및 연결선 초기화
+  dom.tagContainer.textContent = '';
+  dom.tagLinesSvg.textContent = '';
+  dom.tagContainer.classList.add('hidden');
+  dom.tagLinesSvg.classList.add('hidden');
   
   // 배틀 상태 해제 및 URL 클리닝
   if (state.isBattleMode) {
@@ -1607,361 +1718,101 @@ function resetToUploadScreen() {
 
 async function exportInstagramStory() {
   const canvas = dom.instagramExportCanvas;
-  const ctx = canvas.getContext('2d');
-  
-  // 로딩 알림 Toast 노출
-  showToast("인스타 스토리 공유 카드 생성 중... 🎨");
+  const ctx = canvas?.getContext('2d');
 
-  // 1. 배경 그라데이션 그리기 (Neo-Brutalist 힙한 연보라 대각선 그라데이션)
-  const grad = ctx.createLinearGradient(0, 0, 1080, 1920);
-  grad.addColorStop(0, '#eae6ff'); // Lavender
-  grad.addColorStop(1, '#ffefea'); // Peach
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 1080, 1920);
-
-  // 2. 외곽 15px 두꺼운 블랙 보더 라인
-  ctx.lineWidth = 30;
-  ctx.strokeStyle = '#000000';
-  ctx.strokeRect(0, 0, 1080, 1920);
-
-  // 3. 타이틀 텍스트 그리기 (Montserrat 스타일 볼드 블랙)
-  ctx.fillStyle = '#000000';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  ctx.font = '900 80px Montserrat, sans-serif';
-  ctx.fillText(state.isBattleMode ? 'FITCHECK! BATTLE' : 'FITCHECK! VERDICT', 540, 150);
-
-  // 4. OOTD 사진 그리기 (일반 모드는 1:1, 배틀 모드는 5:5 분할 드로잉)
-  const imgElement = state.isBattleMode ? dom.resultOotdImgChallenger : dom.resultOotdImg;
-  const imgWidth = 650;
-  const imgHeight = 650;
-  const imgX = (1080 - imgWidth) / 2; // 215
-  const imgY = 240;
-
-  // 4-1. 사진 아래 15px 블랙 그림자 사각형
-  ctx.fillStyle = '#000000';
-  ctx.fillRect(imgX + 15, imgY + 15, imgWidth, imgHeight);
-
-  if (state.isBattleMode) {
-    // === 배틀 모드: 5:5 좌우 분할 드로잉 ===
-    const halfW = imgWidth / 2; // 325
-
-    // [왼쪽: 상대방 정보 카드]
-    ctx.fillStyle = '#fff9e6'; // Cream background for opponent
-    ctx.fillRect(imgX, imgY, halfW, imgHeight);
-
-    // 상대방 실루엣 원 그리기
-    ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.arc(imgX + 162.5, imgY + 180, 70, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // 👤 이모지 그리기
-    ctx.fillStyle = '#000000';
-    ctx.font = '80px Lexend, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('👤', imgX + 162.5, imgY + 180);
-
-    // OPPONENT 배너
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(imgX + 62.5, imgY + 280, 200, 45);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 22px Montserrat, sans-serif';
-    ctx.fillText('OPPONENT', imgX + 162.5, imgY + 305);
-
-    // 상대방 점수
-    ctx.fillStyle = '#000000';
-    ctx.font = '900 42px Montserrat, sans-serif';
-    ctx.fillText(`${state.opponentScore.toLocaleString()} PTS`, imgX + 162.5, imgY + 390);
-
-    // 상대방 티어
-    ctx.fillStyle = '#47464c';
-    ctx.font = 'bold 22px Lexend, sans-serif';
-    ctx.fillText(calculateTier(state.opponentScore), imgX + 162.5, imgY + 440);
-
-    // [오른쪽: 도전자 내 이미지]
-    ctx.fillStyle = '#eeeeee';
-    ctx.fillRect(imgX + halfW, imgY, halfW, imgHeight);
-
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-
-    const naturalWidth = imgElement.naturalWidth || imgElement.width || halfW;
-    const naturalHeight = imgElement.naturalHeight || imgElement.height || imgHeight;
-
-    let drawW = halfW;
-    let drawH = imgHeight;
-    let offsetX = 0;
-    let offsetY = 0;
-
-    const containerRatio = halfW / imgHeight;
-    const imgRatio = naturalWidth / naturalHeight;
-
-    if (imgRatio > containerRatio) {
-      drawH = halfW / imgRatio;
-      offsetY = (imgHeight - drawH) / 2;
-    } else {
-      drawW = imgHeight * imgRatio;
-      offsetX = (halfW - drawW) / 2;
-    }
-
-    ctx.drawImage(imgElement, imgX + halfW + offsetX, imgY + offsetY, drawW, drawH);
-
-    // 분할선 그리기
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = '#000000';
-    ctx.beginPath();
-    ctx.moveTo(imgX + halfW, imgY);
-    ctx.lineTo(imgX + halfW, imgY + imgHeight);
-    ctx.stroke();
-
-    // 외곽 보더라인 그리기
-    ctx.lineWidth = 10;
-    ctx.strokeRect(imgX, imgY, imgWidth, imgHeight);
-
-    // 승패 캔버스 도장 드로잉
-    function drawCanvasStamp(centerX, centerY, text, isWin) {
-      ctx.save();
-      ctx.translate(centerX, centerY);
-      ctx.rotate(isWin ? 12 * Math.PI / 180 : -12 * Math.PI / 180);
-      
-      ctx.font = '900 36px Montserrat, sans-serif';
-      const textWidth = ctx.measureText(text).width;
-      const rectW = textWidth + 40;
-      const rectH = 65;
-      
-      // Shadow
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(-rectW/2 + 6, -rectH/2 + 6, rectW, rectH);
-      
-      // Border & Background
-      ctx.fillStyle = isWin ? '#e2f4eb' : '#ffdad6'; // Mint or Salmon
-      ctx.fillRect(-rectW/2, -rectH/2, rectW, rectH);
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = '#000000';
-      ctx.strokeRect(-rectW/2, -rectH/2, rectW, rectH);
-      
-      // Text
-      ctx.fillStyle = '#000000';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(text, 0, 3);
-      
-      ctx.restore();
-    }
-
-    if (state.score > state.opponentScore) {
-      drawCanvasStamp(imgX + 162.5, imgY + 520, 'LOSE 💀', false);
-      drawCanvasStamp(imgX + 487.5, imgY + 520, 'WIN 🏆', true);
-    } else {
-      drawCanvasStamp(imgX + 162.5, imgY + 520, 'WIN 🏆', true);
-      drawCanvasStamp(imgX + 487.5, imgY + 520, 'LOSE 💀', false);
-    }
-
-  } else {
-    // === 일반 모드: 단일 이미지 드로잉 ===
-    ctx.fillStyle = '#eeeeee';
-    ctx.fillRect(imgX, imgY, imgWidth, imgHeight);
-
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-
-    const naturalWidth = imgElement.naturalWidth || imgElement.width || imgWidth;
-    const naturalHeight = imgElement.naturalHeight || imgElement.height || imgHeight;
-
-    let drawW = imgWidth;
-    let drawH = imgHeight;
-    let offsetX = 0;
-    let offsetY = 0;
-
-    const containerRatio = imgWidth / imgHeight;
-    const imgRatio = naturalWidth / naturalHeight;
-
-    if (imgRatio > containerRatio) {
-      drawH = imgWidth / imgRatio;
-      offsetY = (imgHeight - drawH) / 2;
-    } else {
-      drawW = imgHeight * imgRatio;
-      offsetX = (imgWidth - drawW) / 2;
-    }
-
-    ctx.drawImage(imgElement, imgX + offsetX, imgY + offsetY, drawW, drawH);
-
-    ctx.lineWidth = 10;
-    ctx.strokeStyle = '#000000';
-    ctx.strokeRect(imgX, imgY, imgWidth, imgHeight);
+  if (!canvas || !ctx) {
+    showToast('공유 카드를 만들 수 없어요. 잠시 후 다시 시도해 주세요.');
+    return;
   }
 
-  // 5. 점수 및 등급 텍스트 합성
-  // 점수 백그라운드 스티커 박스
-  ctx.fillStyle = '#fff9e6'; // Cream
-  ctx.fillRect(215, 930, 650, 160);
-  ctx.lineWidth = 8;
-  ctx.strokeStyle = '#000000';
-  ctx.strokeRect(215, 930, 650, 160);
+  showToast('인스타 스토리 공유 카드 생성 중... 🎨');
 
-  ctx.fillStyle = '#000000';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-
-  if (state.isBattleMode) {
-    ctx.font = '900 52px Montserrat, sans-serif';
-    ctx.fillText(`BATTLE ${state.score > state.opponentScore ? 'VICTORY 🏆' : 'DEFEAT 💀'}`, 540, 1000);
-    
-    ctx.font = 'bold 32px Lexend, sans-serif';
-    ctx.fillText(`상대방: ${state.opponentScore.toLocaleString()}점 VS 나: ${state.score.toLocaleString()}점`, 540, 1055);
-  } else {
-    ctx.font = '900 64px Montserrat, sans-serif';
-    ctx.fillText(`${state.score.toLocaleString()} / 10,000 PTS`, 540, 1005);
-    
-    ctx.font = 'bold 36px Lexend, sans-serif';
-    ctx.fillText(`상황: ${state.selectedTpo} | 티어: ${state.tier}`, 540, 1060);
-  }
-
-  // 6. 뼈 때리는 한줄평 멘트 (멀티라인 드로잉 처리)
-  ctx.fillStyle = '#ffefea'; // Peach
-  ctx.fillRect(115, 1130, 850, 180);
-  ctx.lineWidth = 6;
-  ctx.strokeStyle = '#000000';
-  ctx.strokeRect(115, 1130, 850, 180);
-
-  ctx.fillStyle = '#000000';
-  ctx.font = 'italic bold 28px Lexend, sans-serif';
-  ctx.textAlign = 'left';
-  
-  const roastWords = dom.resultRoastText.textContent;
-  wrapText(ctx, roastWords, 150, 1195, 780, 42);
-
-  // 7. 5대 스탯 바차트 합성
-  ctx.fillStyle = '#000000';
-  ctx.textAlign = 'center';
-  ctx.font = '900 32px Montserrat, sans-serif';
-  ctx.fillText('VIBE CHECK SPECS', 540, 1375);
-
-  const startStatY = 1430;
-  const colors = ['#eae6ff', '#e2f4eb', '#ffefea', '#fff9e6', '#ffffff'];
-
-  state.stats.forEach((stat, idx) => {
-    const curY = startStatY + (idx * 75);
-    
-    // 스탯 이름
-    ctx.fillStyle = '#000000';
-    ctx.font = 'bold 22px Lexend, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText(stat.name, 140, curY + 22);
-
-    // 스탯 바 테두리
-    const barWidth = 550;
-    const barHeight = 32;
-    ctx.strokeRect(360, curY, barWidth, barHeight);
-    
-    // 스탯 차오르는 바 그리기
-    ctx.fillStyle = colors[idx % colors.length];
-    const fillWidth = (stat.val / 100) * barWidth;
-    ctx.fillRect(360, curY, fillWidth, barHeight);
-    ctx.strokeRect(360, curY, fillWidth, barHeight);
-
-    // 스탯 백분율 수치
-    ctx.fillStyle = '#000000';
-    ctx.font = '900 24px Montserrat, sans-serif';
-    ctx.textAlign = 'right';
-    ctx.fillText(`${stat.val}%`, 1000, curY + 24);
-  });
-
-  // 8. 풋터 마크 로고
-  ctx.fillStyle = '#000000';
-  ctx.textAlign = 'center';
-  ctx.font = 'bold 26px Lexend, sans-serif';
-  ctx.fillText(state.isBattleMode ? '대결을 수락하고 덤벼라! @team.letsgo_fit' : '내 친구들은 몇점? @team.letsgo_fit', 540, 1850);
-
-  // 9. 최종 공유 카드는 사진, 점수, 상황, 티어와 팀 소개만 간결하게 담는다.
-  let shareImage = state.isBattleMode ? dom.resultOotdImgChallenger : dom.resultOotdImg;
-  if (!state.isBattleMode && state.improvedOotdImage) {
-    shareImage = new Image();
-    shareImage.src = state.improvedOotdImage;
-    await shareImage.decode();
-  }
-  drawFinalShareCard(ctx, canvas, shareImage);
-
-  // 10. 이미지 다운로드 트리거 및 모달 오픈
-  setTimeout(() => {
-    try {
-      const dataUrl = canvas.toDataURL('image/png');
-      
-      // 모달에 미리보기 이미지 설정
-      if (dom.instagramPreviewImg) {
-        dom.instagramPreviewImg.src = dataUrl;
-      }
-
-      const downloadLink = document.createElement('a');
-      downloadLink.download = `fitcheck_ootd_${state.score}.png`;
-      downloadLink.href = dataUrl;
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
-      showToast("업로드한 사진이 이미지 파일로 다운로드되었습니다! 💾");
-      playSound('download');
-
-      // 모달 오버레이 오픈 (사용자 인스타 연동 UX)
-      if (dom.instagramRedirectModal) {
-        dom.instagramRedirectModal.classList.remove('hidden');
-      }
-    } catch (err) {
-      console.error("Canvas export failed", err);
-      showToast("이미지 렌더링에 실패했습니다. (CORS 보안 설정 우려)");
+  try {
+    let shareImage = state.isBattleMode ? dom.resultOotdImgChallenger : dom.resultOotdImg;
+    if (!state.isBattleMode && state.improvedOotdImage) {
+      shareImage = new Image();
+      shareImage.src = state.improvedOotdImage;
+      await shareImage.decode();
+    } else if (!shareImage.complete || !shareImage.naturalWidth) {
+      await shareImage.decode();
     }
-  }, 100);
+
+    drawFinalShareCard(ctx, canvas, shareImage, dom.resultRoastText?.textContent || '');
+
+    state.shareImageDataUrl = canvas.toDataURL('image/png');
+    if (dom.instagramPreviewImg) {
+      dom.instagramPreviewImg.src = state.shareImageDataUrl;
+    }
+
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    state.shareImageFile = blob
+      ? new File([blob], `fitcheck_ootd_${state.score}.png`, { type: 'image/png' })
+      : null;
+
+    const canShareFile = Boolean(
+      state.shareImageFile &&
+      navigator.share &&
+      navigator.canShare &&
+      navigator.canShare({ files: [state.shareImageFile] })
+    );
+    dom.btnShareSystem?.classList.toggle('hidden', !canShareFile);
+    dom.instagramRedirectModal?.classList.remove('hidden');
+    playSound('success');
+  } catch (error) {
+    console.error('Canvas export failed', error instanceof Error ? error.message : error);
+    showToast('공유 카드를 만들지 못했어요. 잠시 후 다시 시도해 주세요.');
+  }
 }
 
-function drawFinalShareCard(ctx, canvas, image) {
+function drawFinalShareCard(ctx, canvas, image, roastText) {
   canvas.width = 1080;
   canvas.height = 1920;
-  const background = ctx.createLinearGradient(0, 0, 1080, 1920);
-  background.addColorStop(0, '#eae6ff');
-  background.addColorStop(1, '#ffefea');
-  ctx.fillStyle = background;
-  ctx.fillRect(0, 0, 1080, 1920);
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 24;
-  ctx.strokeRect(12, 12, 1056, 1896);
 
-  ctx.fillStyle = '#000';
-  ctx.textAlign = 'center';
-  ctx.font = '900 70px Montserrat, sans-serif';
-  ctx.fillText('FITCHECK!', 540, 105);
-
-  const frame = { x: 90, y: 155, width: 900, height: 1240 };
-  ctx.fillStyle = '#000';
-  ctx.fillRect(frame.x + 14, frame.y + 14, frame.width, frame.height);
-  ctx.fillStyle = '#eee';
-  ctx.fillRect(frame.x, frame.y, frame.width, frame.height);
   const sourceWidth = image.naturalWidth || image.width;
   const sourceHeight = image.naturalHeight || image.height;
-  const scale = Math.min(frame.width / sourceWidth, frame.height / sourceHeight);
+  const scale = Math.max(canvas.width / sourceWidth, canvas.height / sourceHeight);
   const width = sourceWidth * scale;
   const height = sourceHeight * scale;
-  ctx.drawImage(image, frame.x + (frame.width - width) / 2, frame.y + (frame.height - height) / 2, width, height);
-  ctx.lineWidth = 10;
-  ctx.strokeRect(frame.x, frame.y, frame.width, frame.height);
 
-  ctx.fillStyle = '#fff9e6';
-  ctx.fillRect(90, 1445, 900, 235);
-  ctx.lineWidth = 8;
-  ctx.strokeRect(90, 1445, 900, 235);
-  ctx.fillStyle = '#000';
-  ctx.font = '900 72px Montserrat, sans-serif';
-  ctx.fillText(`${state.score.toLocaleString()} / 10K`, 540, 1545);
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(image, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
+
+  const gradient = ctx.createLinearGradient(0, 950, 0, 1920);
+  gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  gradient.addColorStop(0.28, 'rgba(0, 0, 0, 0.72)');
+  gradient.addColorStop(1, 'rgba(0, 0, 0, 0.96)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 900, canvas.width, 1020);
+
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#fff';
+  ctx.font = '800 34px Montserrat, sans-serif';
+  ctx.fillText('OOTD COMBAT POWER', 80, 1260);
+
+  ctx.font = '900 150px Montserrat, sans-serif';
+  ctx.fillText(state.score.toLocaleString(), 72, 1415);
+
+  ctx.font = '700 38px Lexend, sans-serif';
+  ctx.fillText(`${state.selectedTpo} · ${state.tier}`, 82, 1490);
+
   ctx.font = '700 34px Lexend, sans-serif';
-  ctx.fillText(`상황: ${state.selectedTpo}  ·  티어: ${state.tier}`, 540, 1625);
+  const finalTextY = wrapText(ctx, roastText, 82, 1580, 916, 52);
 
+  if (state.improvedOotdImage) {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
+    ctx.font = '600 24px Lexend, sans-serif';
+    ctx.fillText('AI로 생성한 콘텐츠', 82, Math.min(finalTextY + 54, 1780));
+  }
+
+  ctx.fillStyle = '#fff';
   ctx.font = '900 34px Montserrat, sans-serif';
-  ctx.fillText('@team.letsgo_fit', 540, 1790);
-  ctx.font = '700 25px Lexend, sans-serif';
-  ctx.fillText('패션을 더 재밌게, 오늘의 OOTD를 함께 체크해요.', 540, 1840);
+  ctx.fillText('@team.letsgo_fit', 82, 1830);
+  ctx.font = '600 25px Lexend, sans-serif';
+  ctx.fillText('패션을 더 재밌게, 오늘의 OOTD를 함께 체크해요.', 82, 1875);
 }
 
 // 텍스트 여러 줄 정렬 도우미
@@ -1982,6 +1833,7 @@ function wrapText(context, text, x, y, maxWidth, lineHeight) {
     }
   }
   context.fillText(line, x, y);
+  return y;
 }
 
 // ========================================================
@@ -2099,6 +1951,41 @@ function openInstagramApp() {
     // 데스크탑 브라우저는 바로 인스타그램 웹 연동
     window.open("https://www.instagram.com/", "_blank", "noopener,noreferrer");
   }
+}
+
+async function shareSystem() {
+  if (!state.shareImageFile || !navigator.share) {
+    showToast('이 브라우저에서는 바로 공유할 수 없어요. 이미지를 저장해 주세요.');
+    return;
+  }
+
+  try {
+    await navigator.share({
+      files: [state.shareImageFile],
+      title: 'FITCHECK! OOTD 결과',
+      text: `내 패션 전투력은 ${state.score.toLocaleString()}점!`,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') return;
+    console.error('System share failed', error instanceof Error ? error.message : error);
+    showToast('공유하지 못했어요. 이미지를 저장해서 올려 주세요.');
+  }
+}
+
+function downloadShareImage() {
+  if (!state.shareImageDataUrl) {
+    showToast('먼저 공유 카드를 만들어 주세요.');
+    return;
+  }
+
+  const downloadLink = document.createElement('a');
+  downloadLink.download = `fitcheck_ootd_${state.score}.png`;
+  downloadLink.href = state.shareImageDataUrl;
+  document.body.appendChild(downloadLink);
+  downloadLink.click();
+  downloadLink.remove();
+  showToast('공유 이미지를 저장했어요! 💾');
+  playSound('download');
 }
 
 // 실행
