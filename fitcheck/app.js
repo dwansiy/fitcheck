@@ -34,7 +34,14 @@ const state = {
   // 공유 기능용 임시 보관 데이터
   shareImageDataUrl: null,
   shareImageFile: null,
+
+  // 최근 패션 체크 기록용 임시 ID (같은 세션 내 개선 적용 시 동일 기록을 갱신)
+  currentRecordId: null,
 };
+
+const RECENT_CHECKS_DB_NAME = 'fitcheck-recent-checks';
+const RECENT_CHECKS_STORE = 'checks';
+const RECENT_CHECKS_LIMIT = 3;
 
 // 2. DOM 요소 셀렉터
 const dom = {
@@ -43,7 +50,9 @@ const dom = {
   appHeader: document.getElementById('app-header'),
   firstVisitGuide: document.getElementById('first-visit-guide'),
   btnCloseFirstVisitGuide: document.getElementById('btn-close-first-visit-guide'),
-  
+  tutorialSlides: document.getElementById('tutorial-slides'),
+  tutorialDots: document.querySelectorAll('.tutorial-dot'),
+
   // 화면 세션들
   screenUpload: document.getElementById('screen-upload'),
   screenLoading: document.getElementById('screen-loading'),
@@ -57,7 +66,9 @@ const dom = {
   imageFileInput: document.getElementById('image-file-input'),
   tpoChips: document.querySelectorAll('.tpo-chip'),
   btnSubmitScan: document.getElementById('btn-submit-scan'),
-  
+  recentChecksCard: document.getElementById('recent-checks-card'),
+  recentChecksList: document.getElementById('recent-checks-list'),
+
   // 로딩 화면
   loadingTitle: document.getElementById('loading-title'),
   loadingStatusText: document.getElementById('loading-status-text'),
@@ -139,7 +150,7 @@ const dom = {
 
 function init() {
   bindEvents();
-  if (localStorage.getItem('fitcheck.fullBodyGuideSeen') !== '1') {
+  if (localStorage.getItem('fitcheck.tutorialSeen.v2') !== '1') {
     dom.firstVisitGuide.classList.remove('hidden');
   }
   
@@ -149,6 +160,8 @@ function init() {
   if (!state.isBattleMode) {
     selectTpo('일상'); // 일반 모드일 때 디폴트는 일상
   }
+
+  renderRecentChecks();
 }
 
 // URL 배틀 쿼리 파라미터 감지기
@@ -191,9 +204,23 @@ function checkBattleQueryParameters() {
 // 이벤트 바인딩
 function bindEvents() {
   dom.btnCloseFirstVisitGuide.addEventListener('click', () => {
-    localStorage.setItem('fitcheck.fullBodyGuideSeen', '1');
+    localStorage.setItem('fitcheck.tutorialSeen.v2', '1');
     dom.firstVisitGuide.classList.add('hidden');
   });
+
+  // 튜토리얼 스와이프 - 현재 슬라이드에 맞춰 도트 인디케이터 갱신
+  if (dom.tutorialSlides) {
+    dom.tutorialSlides.addEventListener('scroll', () => {
+      const slideIndex = Math.round(dom.tutorialSlides.scrollLeft / dom.tutorialSlides.clientWidth);
+      dom.tutorialDots.forEach((dot, idx) => {
+        dot.classList.toggle('bg-black/20', idx !== slideIndex);
+        dot.classList.toggle('bg-black', idx === slideIndex);
+        dot.classList.toggle('w-5', idx === slideIndex);
+        dot.classList.toggle('w-2', idx !== slideIndex);
+      });
+    });
+  }
+
   // 1. TPO 칩 클릭
   dom.tpoChips.forEach(chip => {
     chip.addEventListener('click', (e) => {
@@ -279,6 +306,13 @@ function bindEvents() {
       }
     });
   }
+  // 개선 적용 후 뜨는 "무신사 검색 ↗" 링크도 동일하게 앱 딥링크 시도 경유
+  if (dom.improvedShoppingLink) {
+    dom.improvedShoppingLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      openMusinsaSearch(dom.improvedShoppingLink.href);
+    });
+  }
   if (dom.btnCloseMusinsaModal) {
     dom.btnCloseMusinsaModal.addEventListener('click', () => {
       dom.musinsaRedirectModal.classList.add('hidden');
@@ -291,7 +325,7 @@ function bindEvents() {
   }
   if (dom.btnConfirmMusinsaRedirect) {
     dom.btnConfirmMusinsaRedirect.addEventListener('click', () => {
-      window.open(state.targetMusinsaUrl, '_blank');
+      openMusinsaSearch(state.targetMusinsaUrl);
       dom.musinsaRedirectModal.classList.add('hidden');
     });
   }
@@ -601,6 +635,9 @@ function calculateFashionResults() {
 
   // 점수판 그리기 및 카운트업
   renderResultDashboard();
+
+  // 최근 패션 체크 기록 저장 (배틀 모드 제외)
+  saveRecentCheck();
 }
 
 // 핀 마커 포지셔닝 및 코디 세팅 (마진 태그 및 연결선으로 전면 재설계)
@@ -994,7 +1031,7 @@ async function applyStyleAdvice() {
   playSound('upgrade');
   dom.tagContainer.classList.add('hidden');
   dom.tagLinesSvg.classList.add('hidden');
-  dom.resultTopOverlayTag.textContent = '개선 이미지';
+  dom.resultTopOverlayTag.textContent = '개선';
   dom.imageVersionToggle.classList.remove('hidden');
   dom.improvedShoppingItem.textContent = recommendItemName;
   dom.improvedShoppingDescription.textContent = state.apiData?.improvementSummary
@@ -1004,6 +1041,7 @@ async function applyStyleAdvice() {
   dom.pinInteractionGuide.classList.add('hidden');
   showImageVersion('after');
   showToast('코디 적용 완료! BEFORE / AFTER로 변신을 확인해 보세요. ✨');
+  saveRecentCheck();
 }
 
 function showImageVersion(version) {
@@ -1012,7 +1050,7 @@ function showImageVersion(version) {
   dom.resultOotdImg.src = showBefore ? state.originalOotdImage : state.improvedOotdImage;
   dom.btnShowBefore.className = `px-2 py-1 text-[10px] font-black ${showBefore ? 'bg-black text-white' : 'bg-white text-black'}`;
   dom.btnShowAfter.className = `px-2 py-1 text-[10px] font-black ${showBefore ? 'bg-white text-black' : 'bg-secondary text-black'}`;
-  dom.resultTopOverlayTag.textContent = showBefore ? '원본' : '개선 이미지';
+  dom.resultTopOverlayTag.textContent = showBefore ? '원본' : '개선';
 }
 
 function applyImprovedAnalysis(analysis, previousStats) {
@@ -1093,17 +1131,16 @@ function renderResultDashboard() {
         dom.resultHeaderBadge.className = "bg-error-container border-[2px] border-black px-3 py-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-xs font-black rotate-[-2deg] text-black";
       }
     }
-    
+
     if (state.score > state.opponentScore) {
       dom.resultRoastText.textContent = `🎉 배틀 승리! 상대방의 밋밋한 착장(점수: ${state.opponentScore.toLocaleString()}점)을 당신의 힙스터 아우라로 완벽하게 제압하고 참교육했습니다. 친구에게 링크를 되돌려주고 승리를 자축하세요! 😎`;
     } else {
       dom.resultRoastText.textContent = `🚨 배틀 패배! 상대방의 견고한 가치관이 깃든 핏(점수: ${state.opponentScore.toLocaleString()}점)에 가로막혀 당신의 OOTD가 대완패를 당했습니다. 추천 코드를 가상 장착하여 복수전을 시작하세요! 😈`;
     }
   } else {
-    // 헤더 배지 복원
+    // 일반 모드에서는 헤더 배지 숨김 (배틀 모드의 승패 표시 전용)
     if (dom.resultHeaderBadge) {
-      dom.resultHeaderBadge.textContent = "QC PASSED ✅";
-      dom.resultHeaderBadge.className = "bg-secondary border-[2px] border-black px-3 py-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-xs font-bold rotate-[2deg] text-black";
+      dom.resultHeaderBadge.classList.add('hidden');
     }
     dom.resultTopOverlayTag.textContent = state.score >= 7000 ? "VOGUE PASS" : "EMERGENCY";
     dom.resultRoastText.textContent = getRoastComment(state.selectedTpo, state.score, state.isPatched);
@@ -1121,6 +1158,159 @@ function calculateTier(score) {
   if (score >= 6000) return '골드';
   if (score >= 4000) return '실버';
   return '아이언';
+}
+
+// ========================================================
+// 최근 패션 체크 기록 (IndexedDB - 이 브라우저에만 영구 저장됨)
+// ========================================================
+
+function openRecentChecksDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(RECENT_CHECKS_DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains(RECENT_CHECKS_STORE)) {
+        request.result.createObjectStore(RECENT_CHECKS_STORE, { keyPath: 'id' });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function saveRecentCheck() {
+  if (state.isBattleMode || !state.apiData) return;
+  try {
+    state.currentRecordId ||= `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const record = {
+      id: state.currentRecordId,
+      createdAt: state.recordCreatedAt || Date.now(),
+      updatedAt: Date.now(),
+      tpo: state.selectedTpo,
+      score: state.score,
+      tier: state.tier,
+      isPatched: !!state.isPatched,
+      apiData: state.apiData,
+      originalImage: state.originalOotdImage,
+      improvedImage: state.improvedOotdImage || null,
+    };
+    state.recordCreatedAt = record.createdAt;
+
+    const db = await openRecentChecksDb();
+    const all = await new Promise((resolve, reject) => {
+      const tx = db.transaction(RECENT_CHECKS_STORE, 'readonly');
+      const request = tx.objectStore(RECENT_CHECKS_STORE).getAll();
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+    const keepIds = new Set([
+      record.id,
+      ...all
+        .filter((item) => item.id !== record.id)
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .slice(0, RECENT_CHECKS_LIMIT - 1)
+        .map((item) => item.id),
+    ]);
+
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(RECENT_CHECKS_STORE, 'readwrite');
+      const store = tx.objectStore(RECENT_CHECKS_STORE);
+      store.put(record);
+      all.forEach((item) => {
+        if (!keepIds.has(item.id)) store.delete(item.id);
+      });
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+    renderRecentChecks();
+  } catch (error) {
+    console.warn('Recent check could not be saved.', error);
+  }
+}
+
+async function loadRecentChecks() {
+  try {
+    const db = await openRecentChecksDb();
+    const all = await new Promise((resolve, reject) => {
+      const tx = db.transaction(RECENT_CHECKS_STORE, 'readonly');
+      const request = tx.objectStore(RECENT_CHECKS_STORE).getAll();
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+    db.close();
+    return all.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, RECENT_CHECKS_LIMIT);
+  } catch (error) {
+    console.warn('Recent checks could not be loaded.', error);
+    return [];
+  }
+}
+
+async function renderRecentChecks() {
+  const records = await loadRecentChecks();
+  if (!dom.recentChecksList || !dom.recentChecksCard) return;
+  dom.recentChecksList.innerHTML = '';
+
+  records.forEach((record) => {
+    const thumb = record.improvedImage || record.originalImage;
+    const date = new Date(record.updatedAt || record.createdAt).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' });
+
+    const card = document.createElement('div');
+    card.className = 'flex items-center gap-3 bg-white border-[3px] border-black neo-shadow p-2 cursor-pointer hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all';
+    card.innerHTML = `
+      <div class="w-16 h-16 shrink-0 border-[2px] border-black bg-[#eeeeee] overflow-hidden">
+        <img src="${thumb}" alt="최근 패션 체크" class="w-full h-full object-cover">
+      </div>
+      <div class="min-w-0 flex-1">
+        <p class="font-headline text-sm font-black truncate">${record.tpo} · ${record.tier}${record.isPatched ? ' · 개선' : ''}</p>
+        <p class="text-[10px] font-bold text-on-surface-variant">${date}</p>
+      </div>
+      <strong class="font-headline text-lg font-black shrink-0">${record.score.toLocaleString()}</strong>
+    `;
+    card.addEventListener('click', () => restoreRecentCheck(record));
+    dom.recentChecksList.appendChild(card);
+  });
+
+  dom.recentChecksCard.classList.toggle('hidden', records.length === 0);
+}
+
+function restoreRecentCheck(record) {
+  state.isBattleMode = false;
+  state.currentRecordId = record.id;
+  state.recordCreatedAt = record.createdAt;
+
+  if (!record.improvedImage) {
+    // 개선(before/after)을 적용하지 않은 기록은 캐시로 때우지 않고,
+    // 저장된 사진으로 실제 재측정을 수행해 Cloudflare Worker를 다시 다녀온다.
+    state.currentOotdImage = record.originalImage;
+    state.originalOotdImage = record.originalImage;
+    state.improvedOotdImage = null;
+    state.apiData = null;
+    dom.uploadPreviewImg.src = record.originalImage;
+    dom.uploadPlaceholder.classList.add('hidden');
+    dom.uploadPreviewContainer.classList.remove('hidden');
+    dom.btnSubmitScan.disabled = false;
+    selectTpo(record.tpo);
+    startScanningSequence();
+    return;
+  }
+
+  // 개선까지 마친 기록은 저장된 스냅샷(분석 결과 + 사진)을 그대로 복원
+  state.selectedTpo = record.tpo;
+  state.apiData = record.apiData;
+  state.originalOotdImage = record.originalImage;
+  state.improvedOotdImage = record.improvedImage;
+  state.currentOotdImage = record.improvedImage;
+
+  calculateFashionResults();
+
+  state.isPatched = true;
+  if (dom.imageVersionToggle) dom.imageVersionToggle.classList.remove('hidden');
+  if (dom.resultTopOverlayTag) dom.resultTopOverlayTag.textContent = '개선';
+
+  if (dom.appHeader) dom.appHeader.classList.remove('hidden');
+  dom.screenUpload.classList.remove('active-screen');
+  dom.screenResult.classList.add('active-screen');
+  playSound('select');
 }
 
 // 스탯별 위트있는 상세 설명 데이터베이스
@@ -1208,8 +1398,14 @@ function renderVibeStats() {
     // 5대 교차 컬러 배치 (Lavender, Mint, Peach, Cream, Deep Lavender)
     const colorClasses = ['bg-primary', 'bg-secondary', 'bg-tertiary', 'bg-cream', 'bg-[#c9c1ff]'];
     const barColor = colorClasses[idx % colorClasses.length];
+    const delta = stat.val - stat.originalVal;
     const baseline = Math.min(stat.originalVal, stat.val);
-    const gain = Math.max(0, stat.val - baseline);
+    const change = Math.abs(delta);
+    const changeBarClass = delta > 0 ? 'bg-[#3182F6]' : 'bg-error';
+    const changeTextClass = delta > 0 ? 'text-[#3182F6]' : 'text-error';
+    const changeLabel = delta
+      ? `${delta > 0 ? '+' : ''}${delta} ${delta > 0 ? 'UP!' : 'DOWN!'}`
+      : '';
 
     const statItem = document.createElement('div');
     statItem.className = "flex flex-col gap-1 cursor-pointer group w-full";
@@ -1218,9 +1414,9 @@ function renderVibeStats() {
         <span class="w-24 font-bold text-xs uppercase tracking-tight text-black">${stat.name}</span>
         <div class="flex-1 h-5 border-[3px] border-black bg-white flex overflow-hidden">
           <div class="stat-bar-base ${barColor} h-full transition-all duration-700" style="width: 0%;"></div>
-          <div class="stat-bar-gain bg-error h-full transition-all duration-700" style="width: 0%;"></div>
+          <div class="stat-bar-gain ${changeBarClass} h-full transition-all duration-700" style="width: 0%;"></div>
         </div>
-        <span class="w-14 text-right text-xs font-headline font-black text-black">${stat.val}%${gain ? `<small class="block text-[8px] text-error">+${gain} UP!</small>` : ''}</span>
+        <span class="w-14 text-right text-xs font-headline font-black text-black">${stat.val}%${change ? `<small class="block text-[8px] ${changeTextClass}">${changeLabel}</small>` : ''}</span>
       </div>
       <div class="stat-desc-container hidden w-full"></div>
     `;
@@ -1254,7 +1450,7 @@ function renderVibeStats() {
       const baseEl = statItem.querySelector('.stat-bar-base');
       const gainEl = statItem.querySelector('.stat-bar-gain');
       if (baseEl) baseEl.style.width = `${baseline}%`;
-      if (gainEl) gainEl.style.width = `${gain}%`;
+      if (gainEl) gainEl.style.width = `${change}%`;
     }, 50);
   });
 }
@@ -1320,6 +1516,8 @@ function resetToUploadScreen() {
   state.score = 0;
   state.isPatched = false;
   state.apiData = null; // API 데이터 리셋
+  state.currentRecordId = null;
+  state.recordCreatedAt = null;
   dom.imageVersionToggle.classList.add('hidden');
   dom.improvedShoppingCard.classList.add('hidden');
   dom.styleEditOverlay.classList.add('hidden');
@@ -1351,12 +1549,11 @@ function resetToUploadScreen() {
       dom.battleChallengeCard.classList.add('hidden');
     }
     
-    // 헤더 배지 복원
+    // 헤더 배지 숨김 (배틀 모드의 승패 표시 전용)
     if (dom.resultHeaderBadge) {
-      dom.resultHeaderBadge.textContent = "QC PASSED ✅";
-      dom.resultHeaderBadge.className = "bg-secondary border-[2px] border-black px-3 py-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-xs font-bold rotate-[2deg] text-black";
+      dom.resultHeaderBadge.classList.add('hidden');
     }
-    
+
     // 버튼 텍스트 복구
     if (dom.btnSubmitScan) {
       const spanEl = dom.btnSubmitScan.querySelector('span');
@@ -1912,10 +2109,119 @@ function fallbackCopyTextToClipboard(text) {
 // 인스타그램 웹 연동
 // 주의: instagram:// 커스텀 스킴은 앱인토스 웹뷰 네이티브 브릿지(Linking)에서
 // 지원하지 않는 스킴이라 열 수 없다는 경고가 발생하고 좀처럼 닫히지 않는다.
-// (앱인토스 SDK도 외부 앱 스킴을 여는 API를 제공하지 않음) 그래서 바로 웹 버전으로 연결한다.
-function openInstagramApp() {
+// (앱인토스 SDK도 외부 앱 스킴을 여는 API를 제공하지 않음)
+// 대신 파일 공유가 가능하면 네이티브 공유 시트를 띄운다 - 사용자가 시트에서 인스타그램을
+// 선택하면 인스타그램 앱 자체의 스토리/게시물 작성 화면으로 사진과 함께 바로 이동한다.
+// 공유가 불가능한 환경(데스크탑 등)에서만 인스타그램 웹으로 폴백한다.
+// 무신사 앱이 설치되어 있으면 앱으로 열고, 없으면(또는 안드로이드가 아니면) 웹으로 이동한다.
+function openMusinsaSearch(url) {
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  if (!isAndroid) {
+    remoteLog('openMusinsaSearch', { branch: 'non-android-web-open', url });
+    window.open(url, '_blank');
+    return;
+  }
+
+  // 안드로이드 표준 Intent URI: 무신사 앱(com.musinsa.store)이 설치되어 있으면
+  // 앱으로 바로 이동하고, 없으면 S.browser_fallback_url로 지정한 웹 페이지로 이동한다.
+  const withoutScheme = url.replace(/^https?:\/\//, '');
+  const intentUrl = `intent://${withoutScheme}#Intent;scheme=https;package=com.musinsa.store;S.browser_fallback_url=${encodeURIComponent(url)};end`;
+  remoteLog('openMusinsaSearch', { branch: 'attempt-intent', intentUrl });
+
+  // 앱인토스 웹뷰가 intent:// 를 지원하지 않을 경우를 대비해, 페이지가 계속 보이면
+  // (= 앱으로 전환되지 않았으면) 직접 웹 URL로 폴백한다.
+  const fallbackTimer = setTimeout(() => {
+    remoteLog('openMusinsaSearch', { branch: 'fallback-timer-fired', documentHidden: document.hidden, url });
+    window.open(url, '_blank');
+  }, 2500);
+  const cancelFallback = (reason) => {
+    remoteLog('openMusinsaSearch', { branch: 'fallback-cancelled', reason });
+    clearTimeout(fallbackTimer);
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+  };
+  const onVisibilityChange = () => {
+    if (document.hidden) cancelFallback('visibilitychange-hidden');
+  };
+  document.addEventListener('visibilitychange', onVisibilityChange);
+
+  try {
+    window.location.href = intentUrl;
+    remoteLog('openMusinsaSearch', { branch: 'intent-navigation-called-no-throw' });
+  } catch (err) {
+    remoteLog('openMusinsaSearch', { branch: 'intent-threw', message: err?.message });
+    cancelFallback('intent-threw');
+    window.open(url, '_blank');
+  }
+}
+
+// 웹뷰 console.log는 wrangler 서버 로그로 전달되지 않아서, 서버로 직접 보내
+// wrangler 콘솔에 남긴다 (개발/QA 디버깅 전용).
+function remoteLog(tag, data) {
+  try {
+    fetch('/api/debug-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tag, ts: new Date().toISOString(), ...data }),
+    }).catch(() => {});
+  } catch {
+    // 무시 - 디버깅 전용 로그이므로 실패해도 앱 동작에 영향 없음
+  }
+}
+
+// 공유 관련 기능 디버깅용 - Web Share/파일 공유 지원 여부를 콘솔/서버 로그에 남긴다.
+function logShareCapability(tag) {
+  const canShareFiles = !!(state.shareImageFile && navigator.canShare?.({ files: [state.shareImageFile] }));
+  const info = {
+    hasShareImageFile: !!state.shareImageFile,
+    hasNavigatorShare: !!navigator.share,
+    hasCanShare: !!navigator.canShare,
+    canShareFiles,
+  };
+  console.log(`[${tag}]`, info);
+  remoteLog(tag, info);
+  return canShareFiles;
+}
+
+// 참고: 이 웹뷰엔 Web Share API가 없고(navigator.share === undefined, 로그로 확인됨),
+// 이미지를 첨부한 채로 인스타 스토리 작성 화면을 여는 건 안드로이드 네이티브
+// content:// URI가 필요해서 웹에서는 만들 수 없다. 그래서 여기서는 "이미지는 이미
+// 저장되어 있으니, 인스타그램 앱만 열어서 사용자가 직접 첨부하게" 하는 것을 목표로 한다.
+async function openInstagramApp() {
   playSound('select');
-  window.open("https://www.instagram.com/", "_blank");
+  logShareCapability('openInstagramApp');
+
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  if (!isAndroid) {
+    remoteLog('openInstagramApp', { branch: 'non-android-web-open' });
+    window.open("https://www.instagram.com/", "_blank");
+    return;
+  }
+
+  const intentUrl = 'intent://instagram.com/#Intent;package=com.instagram.android;scheme=https;S.browser_fallback_url=' + encodeURIComponent('https://www.instagram.com/') + ';end';
+  remoteLog('openInstagramApp', { branch: 'attempt-intent', intentUrl });
+
+  const fallbackTimer = setTimeout(() => {
+    remoteLog('openInstagramApp', { branch: 'fallback-timer-fired', documentHidden: document.hidden });
+    window.open("https://www.instagram.com/", "_blank");
+  }, 2500);
+  const cancelFallback = (reason) => {
+    remoteLog('openInstagramApp', { branch: 'fallback-cancelled', reason });
+    clearTimeout(fallbackTimer);
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+  };
+  const onVisibilityChange = () => {
+    if (document.hidden) cancelFallback('visibilitychange-hidden');
+  };
+  document.addEventListener('visibilitychange', onVisibilityChange);
+
+  try {
+    window.location.href = intentUrl;
+    remoteLog('openInstagramApp', { branch: 'intent-navigation-called-no-throw' });
+  } catch (err) {
+    remoteLog('openInstagramApp', { branch: 'intent-threw', message: err?.message });
+    cancelFallback('intent-threw');
+    window.open("https://www.instagram.com/", "_blank");
+  }
 }
 
 // 시스템 공유 API 호출 (Web Share API)
@@ -1941,26 +2247,56 @@ async function shareSystem() {
   }
 }
 
+// data: URL을 fetch() 없이 직접 Blob으로 변환 (일부 웹뷰는 data: URI에 대한
+// fetch()를 제대로 지원하지 않아서, atob 기반 수동 디코딩으로 우회한다)
+function dataUrlToBlob(dataUrl) {
+  const [header, base64] = dataUrl.split(',');
+  const mimeMatch = header.match(/data:(.*?);base64/);
+  const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mimeType });
+}
+
 // 선택적 이미지 다운로드 실행
-function downloadShareImage() {
+// 참고: 이 웹뷰 환경엔 Web Share API 자체가 없음(navigator.share === undefined)이
+// 로그로 확인되어, 공유 시트 경유 방식은 포기하고 blob URL 다운로드로 시도한다.
+async function downloadShareImage() {
+  remoteLog('downloadShareImage', {
+    branch: 'called',
+    hasShareImageDataUrl: !!state.shareImageDataUrl,
+    dataUrlLength: state.shareImageDataUrl?.length || 0,
+  });
   if (!state.shareImageDataUrl) {
     showToast("다운로드할 이미지가 없습니다.");
     return;
   }
 
+  let objectUrl;
   try {
+    const blob = dataUrlToBlob(state.shareImageDataUrl);
+    remoteLog('downloadShareImage', { branch: 'blob-created', blobSize: blob.size, blobType: blob.type });
+
+    objectUrl = URL.createObjectURL(blob);
+    remoteLog('downloadShareImage', { branch: 'object-url-created', objectUrl });
+
     const downloadLink = document.createElement('a');
     downloadLink.download = `fitcheck_ootd_${state.score}.png`;
-    downloadLink.href = state.shareImageDataUrl;
+    downloadLink.href = objectUrl;
     document.body.appendChild(downloadLink);
     downloadLink.click();
     document.body.removeChild(downloadLink);
-    
-    showToast("이미지가 기기에 저장되었습니다! 💾");
+    remoteLog('downloadShareImage', { branch: 'blob-download-dispatched-no-throw' });
+
+    showToast("이미지가 기기에 저장되었습니다! 갤러리/다운로드 폴더를 확인해 주세요. 💾");
     playSound('download');
+    remoteLog('downloadShareImage', { branch: 'toast-and-sound-called' });
   } catch (err) {
-    console.error("Download failed", err);
+    remoteLog('downloadShareImage', { branch: 'blob-download-threw', message: err?.message, stack: err?.stack });
     showToast("이미지 다운로드에 실패했습니다.");
+  } finally {
+    if (objectUrl) setTimeout(() => URL.revokeObjectURL(objectUrl), 5000);
   }
 }
 

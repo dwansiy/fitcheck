@@ -15,17 +15,59 @@
 <body class="font-body text-black min-h-screen flex flex-col pb-8 bg-[#eae6ff]">
 
   <div id="first-visit-guide" class="fixed inset-0 z-[100] bg-black/70 p-5 flex items-center justify-center hidden">
-    <div class="w-full max-w-sm bg-white border-[3px] border-black neo-shadow p-5 text-center">
-      <span class="inline-block bg-secondary border-[2px] border-black px-3 py-1 text-[10px] font-black rotate-[-2deg]">PHOTO GUIDE</span>
-      <h2 class="font-headline text-2xl font-black mt-3">전신이 다 보이면<br>분석이 더 정확해요!</h2>
-      <img src="/assets/full-body-example.png" alt="머리부터 신발까지 중앙에 보이는 전신샷 예시" class="w-full max-h-[55vh] object-contain my-3 border-[3px] border-black bg-primary">
-      <p class="text-xs font-bold mb-4">머리부터 신발까지 잘리지 않게, 몸 전체를 화면 중앙에 맞춰 주세요.</p>
-      <button id="btn-close-first-visit-guide" class="w-full bg-tertiary border-[3px] border-black py-3 font-headline font-black neo-shadow">확인했어요 📸</button>
+    <div class="w-full max-w-sm bg-white border-[3px] border-black neo-shadow flex flex-col overflow-hidden">
+      <div id="tutorial-slides" class="flex overflow-x-auto snap-x snap-mandatory hide-scroll">
+        <!-- 1. 환영 -->
+        <div class="tutorial-slide shrink-0 w-full snap-start p-5 text-center flex flex-col items-center">
+          <span class="inline-block bg-primary border-[2px] border-black px-3 py-1 text-[10px] font-black rotate-[-2deg]">WELCOME</span>
+          <h2 class="font-headline text-2xl font-black mt-3">핏체크에 오신 걸<br>환영합니다! 🎉</h2>
+          <div class="w-full aspect-square my-3 border-[3px] border-black bg-primary flex items-center justify-center text-7xl">🕵️‍♀️</div>
+          <p class="text-xs font-bold">내 OOTD 사진 한 장으로 오늘의 패션력을 측정해봐요. 어떻게 하는지 슥슥 넘겨서 확인해보세요!</p>
+        </div>
+        <!-- 2. 사진 가이드 -->
+        <div class="tutorial-slide shrink-0 w-full snap-start p-5 text-center flex flex-col items-center">
+          <span class="inline-block bg-secondary border-[2px] border-black px-3 py-1 text-[10px] font-black rotate-[-2deg]">PHOTO GUIDE</span>
+          <h2 class="font-headline text-2xl font-black mt-3">전신이 다 보이면<br>분석이 더 정확해요!</h2>
+          <img src="/assets/full-body-example.png" alt="머리부터 신발까지 중앙에 보이는 전신샷 예시" class="w-full aspect-square object-contain my-3 border-[3px] border-black bg-primary">
+          <p class="text-xs font-bold">머리부터 신발까지 잘리지 않게, 몸 전체를 화면 중앙에 맞춰 주세요.</p>
+        </div>
+        <!-- 3. TPO 선택 -->
+        <div class="tutorial-slide shrink-0 w-full snap-start p-5 text-center flex flex-col items-center">
+          <span class="inline-block bg-tertiary border-[2px] border-black px-3 py-1 text-[10px] font-black rotate-[-2deg]">STEP 2</span>
+          <h2 class="font-headline text-2xl font-black mt-3">오늘 어떤 상황인가요?</h2>
+          <div class="w-full aspect-square my-3 border-[3px] border-black bg-tertiary flex items-center justify-center text-7xl">☕💼🏋️</div>
+          <p class="text-xs font-bold">일상, 데이트, 출근처럼 상황(TPO)을 고르면 그에 맞게 AI가 패션력을 채점해줘요.</p>
+        </div>
+        <!-- 4. AI 측정 -->
+        <div class="tutorial-slide shrink-0 w-full snap-start p-5 text-center flex flex-col items-center">
+          <span class="inline-block bg-cream border-[2px] border-black px-3 py-1 text-[10px] font-black rotate-[-2deg]">STEP 3</span>
+          <h2 class="font-headline text-2xl font-black mt-3">AI가 채점해드려요 🤖</h2>
+          <div class="w-full aspect-square my-3 border-[3px] border-black bg-cream flex items-center justify-center text-7xl">🔍✨</div>
+          <p class="text-xs font-bold">Google Gemini가 사진을 분석해서 점수, 한줄평, 개선 포인트까지 알려줘요. 결과는 모두 AI가 생성해요.</p>
+        </div>
+        <!-- 5. 공유/배틀 -->
+        <div class="tutorial-slide shrink-0 w-full snap-start p-5 text-center flex flex-col items-center">
+          <span class="inline-block bg-[#c9c1ff] border-[2px] border-black px-3 py-1 text-[10px] font-black rotate-[-2deg]">STEP 4</span>
+          <h2 class="font-headline text-2xl font-black mt-3">친구와 배틀도 가능해요 🥊</h2>
+          <div class="w-full aspect-square my-3 border-[3px] border-black bg-[#c9c1ff] flex items-center justify-center text-7xl">📲🔗</div>
+          <p class="text-xs font-bold">결과를 인스타에 공유하거나, 링크로 친구에게 도전장을 보내 패션력 대결을 해보세요!</p>
+        </div>
+      </div>
+      <div class="flex items-center justify-center gap-2 py-3">
+        <span class="tutorial-dot w-2 h-2 rounded-full bg-black/20 transition-all" data-dot="0"></span>
+        <span class="tutorial-dot w-2 h-2 rounded-full bg-black/20 transition-all" data-dot="1"></span>
+        <span class="tutorial-dot w-2 h-2 rounded-full bg-black/20 transition-all" data-dot="2"></span>
+        <span class="tutorial-dot w-2 h-2 rounded-full bg-black/20 transition-all" data-dot="3"></span>
+        <span class="tutorial-dot w-2 h-2 rounded-full bg-black/20 transition-all" data-dot="4"></span>
+      </div>
+      <div class="p-5 pt-0">
+        <button id="btn-close-first-visit-guide" class="w-full bg-tertiary border-[3px] border-black py-3 font-headline font-black neo-shadow">시작해볼게요 📸</button>
+      </div>
     </div>
   </div>
 
   <!-- 글로벌 토스트 알림 -->
-  <div id="app-toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-white border-[3px] border-black px-6 py-3 neo-shadow font-bold hidden transition-all duration-300">
+  <div id="app-toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[110] bg-white border-[3px] border-black px-6 py-3 neo-shadow font-bold hidden transition-all duration-300">
     <span id="toast-text">알림 메세지</span>
   </div>
 
@@ -130,6 +172,15 @@
       <button type="button" id="btn-submit-scan" class="w-full mt-4 bg-tertiary border-[3px] border-black neo-shadow px-6 py-6 transform rotate-[1deg] hover:bg-white active:translate-x-1 active:translate-y-1 active:shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none" disabled>
         <span class="font-headline text-2xl font-black uppercase text-black">패션력 측정하기</span>
       </button>
+      <!-- 최근 패션 체크 기록 (최대 3개, 이미지 카드) -->
+      <div id="recent-checks-card" class="hidden w-full flex flex-col gap-2">
+        <div class="flex items-center justify-between px-1">
+          <h3 class="font-headline text-sm font-black">최근 패션 체크 기록</h3>
+          <span class="text-[9px] font-bold text-on-surface-variant">사진은 이 기기에만 저장돼요 🔒</span>
+        </div>
+        <div id="recent-checks-list" class="flex flex-col gap-2"></div>
+      </div>
+
       <p class="text-[11px] leading-relaxed text-black/70 text-center px-2">
         측정 및 이미지 개선을 실행하면 선택한 사진이 분석을 위해 Google Gemini 또는 Cloudflare Workers AI로 전송됩니다. 사진은 결과 생성 목적으로만 처리되며 FitCheck 서버에 별도로 저장하지 않습니다.
       </p>
@@ -177,8 +228,7 @@
         <!-- 카드 상단 헤더 스트립 -->
         <div class="flex items-center justify-between p-4 border-b-[3px] border-black bg-cream">
           <h2 id="result-header-title" class="font-headline font-black italic text-lg tracking-tighter uppercase text-black">FITCHECK! RESULT</h2>
-          <div id="result-header-badge" class="bg-secondary border-[2px] border-black px-3 py-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-xs font-bold rotate-[2deg] text-black">
-            QC PASSED ✅
+          <div id="result-header-badge" class="hidden bg-secondary border-[2px] border-black px-3 py-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-xs font-bold rotate-[2deg] text-black">
           </div>
         </div>
 
@@ -283,9 +333,6 @@
           
           <!-- 점수 & 티어 표시 판넬 -->
           <div class="text-center relative">
-            <span class="inline-flex items-center gap-1 bg-white border-[2px] border-black px-2.5 py-1 text-[10px] font-black uppercase tracking-tight shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] mb-2">
-              🤖 AI 생성 결과
-            </span>
             <h3 class="text-xs font-black uppercase text-on-surface-variant tracking-widest leading-none mb-1">OOTD COMBAT POWER</h3>
             <h1 class="font-headline text-5xl font-black tracking-tighter mb-2 flex items-center justify-center gap-1">
               <span id="result-score-num" class="text-black">0</span>
@@ -381,7 +428,7 @@
         생성된 카드를 인스타그램 스토리에 공유해보세요! 📸
       </p>
       <div class="bg-tertiary border-[2px] border-black p-3 text-[10px] font-bold text-black">
-        💡 Tip: 모바일 기기에서는 바로 공유가 가능하며, 컴퓨터에서는 이미지를 저장한 후 인스타에 업로드할 수 있습니다.
+        💡 Tip: 이미지를 저장한 후 인스타그램에서 스토리로 업로드해보세요.
       </div>
       <div class="flex flex-col gap-2 mt-2">
         <!-- 모바일 시스템 공유 버튼 (Web Share API 대응) -->

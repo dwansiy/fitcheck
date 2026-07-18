@@ -8,6 +8,10 @@ const MODEL_REGISTRY = Object.freeze({
     provider: 'gemini',
     capabilities: [AI_FEATURES.OUTFIT_ANALYSIS],
   },
+  'gemini-3.5-flash': {
+    provider: 'gemini',
+    capabilities: [AI_FEATURES.OUTFIT_ANALYSIS],
+  },
   '@cf/black-forest-labs/flux-2-klein-4b': {
     provider: 'cloudflare-workers-ai',
     capabilities: [AI_FEATURES.STYLE_EDIT],
