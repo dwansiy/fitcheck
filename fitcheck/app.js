@@ -128,7 +128,9 @@ const dom = {
   btnCloseMusinsaModalCancel: document.getElementById('btn-close-musinsa-modal-cancel'),
   btnConfirmMusinsaRedirect: document.getElementById('btn-confirm-musinsa-redirect'),
   musinsaItemName: document.getElementById('musinsa-item-name'),
-  pinInteractionGuide: document.getElementById('pin-interaction-guide')
+  pinInteractionGuide: document.getElementById('pin-interaction-guide'),
+  tpoScrollContainer: document.getElementById('tpo-scroll-container'),
+  tpoScrollHint: document.getElementById('tpo-scroll-hint')
 };
 
 // ========================================================
@@ -230,6 +232,25 @@ function bindEvents() {
   // 9. 배틀 링크 복사
   if (dom.btnCopyLink) dom.btnCopyLink.addEventListener('click', copyBattleLink);
 
+  // TPO 스크롤 - PC 마우스 휠로 수평 스크롤 지원 + 힌트 화살표 숨김
+  if (dom.tpoScrollContainer) {
+    dom.tpoScrollContainer.addEventListener('wheel', (e) => {
+      if (e.deltaY !== 0) {
+        e.preventDefault();
+        dom.tpoScrollContainer.scrollLeft += e.deltaY;
+      }
+    }, { passive: false });
+
+    const updateScrollHint = () => {
+      if (!dom.tpoScrollHint) return;
+      const el = dom.tpoScrollContainer;
+      const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 4;
+      dom.tpoScrollHint.style.opacity = atEnd ? '0' : '1';
+    };
+    dom.tpoScrollContainer.addEventListener('scroll', updateScrollHint);
+    updateScrollHint();
+  }
+
   // 10. 인스타 바로가기 모달 연동
   if (dom.btnCloseRedirectModal) {
     dom.btnCloseRedirectModal.addEventListener('click', () => {
@@ -308,9 +329,12 @@ function handleCustomFileUpload(e) {
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = function(event) {
-    state.currentOotdImage = event.target.result;
-    state.originalOotdImage = event.target.result;
+  reader.onload = async function(event) {
+    // 폰 카메라 원본 사진은 서버의 base64 길이 제한(4.5MB 문자)을 넘기기 쉬워서
+    // 분석에 충분한 해상도로 리사이즈/압축 후 사용한다.
+    const resizedDataUrl = await resizeImageForUpload(event.target.result);
+    state.currentOotdImage = resizedDataUrl;
+    state.originalOotdImage = resizedDataUrl;
     state.improvedOotdImage = null;
 
     // 미리보기 렌더링
@@ -324,6 +348,25 @@ function handleCustomFileUpload(e) {
     playSound('select');
   };
   reader.readAsDataURL(file);
+}
+
+// 업로드 이미지 리사이즈/압축 (분석 API 전송용)
+async function resizeImageForUpload(dataUrl) {
+  const image = new Image();
+  image.src = dataUrl;
+  await image.decode();
+
+  const maxDimension = 1440;
+  const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const context = canvas.getContext('2d');
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+  return canvas.toDataURL('image/jpeg', 0.85);
 }
 
 // API 호출 및 다중 폴백 로직
@@ -1866,20 +1909,13 @@ function fallbackCopyTextToClipboard(text) {
   document.body.removeChild(textArea);
 }
 
-// 인스타그램 딥링크 연결 (모바일 기기 판단 및 Fallback 지원)
+// 인스타그램 웹 연동
+// 주의: instagram:// 커스텀 스킴은 앱인토스 웹뷰 네이티브 브릿지(Linking)에서
+// 지원하지 않는 스킴이라 열 수 없다는 경고가 발생하고 좀처럼 닫히지 않는다.
+// (앱인토스 SDK도 외부 앱 스킴을 여는 API를 제공하지 않음) 그래서 바로 웹 버전으로 연결한다.
 function openInstagramApp() {
   playSound('select');
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  if (isMobile) {
-    window.location.href = "instagram://";
-    // 1.2초 후 백그라운드 웹 연동(인스타그램 미설치 시)
-    setTimeout(() => {
-      window.open("https://www.instagram.com/", "_blank");
-    }, 1200);
-  } else {
-    // 데스크탑 브라우저는 바로 인스타그램 웹 연동
-    window.open("https://www.instagram.com/", "_blank");
-  }
+  window.open("https://www.instagram.com/", "_blank");
 }
 
 // 시스템 공유 API 호출 (Web Share API)
