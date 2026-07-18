@@ -271,7 +271,7 @@
               <p id="improved-shopping-item" class="font-headline text-sm font-black truncate">추천 아이템</p>
               <p id="improved-shopping-description" class="text-[10px] font-bold mt-1"></p>
             </div>
-            <a id="improved-shopping-link" href="#" target="_blank" rel="noopener noreferrer" data-shopping-link="true" class="shrink-0 bg-white border-[2px] border-black px-3 py-2 text-xs font-black neo-shadow">이 코디 쇼핑하기 ↗</a>
+            <a id="improved-shopping-link" href="#" target="_blank" rel="noopener noreferrer" class="shrink-0 bg-white border-[2px] border-black px-3 py-2 text-xs font-black neo-shadow">이 코디 쇼핑하기 ↗</a>
           </div>
           <div id="improvement-change-summary" class="hidden mt-3 pt-3 border-t-[2px] border-black">
             <p class="text-[9px] font-black uppercase mb-2">⚡ UPGRADE REPORT</p>
@@ -307,7 +307,7 @@
           </div>
           <p id="style-edit-policy-note" class="hidden mb-3 bg-cream border-[2px] border-black p-2.5 text-[10px] font-bold leading-relaxed text-black">이 아이템은 사진 적용 대신 비슷한 상품 찾기만 지원해요.</p>
           <div class="flex gap-2">
-            <a id="link-shopping" href="" target="_blank" rel="noopener noreferrer" data-shopping-link="true" class="flex-1 bg-white border-[2px] border-black p-3 font-bold text-center text-xs neo-shadow hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all flex items-center justify-center gap-1 text-black">
+            <a id="link-shopping" href="" target="_blank" rel="noopener noreferrer" class="flex-1 bg-white border-[2px] border-black p-3 font-bold text-center text-xs neo-shadow hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all flex items-center justify-center gap-1 text-black">
               비슷한 상품 찾기 <span class="material-symbols-outlined text-xs">open_in_new</span>
             </a>
             <button id="btn-apply-advice" class="flex-1 bg-secondary border-[2px] border-black p-3 font-headline font-black text-xs uppercase neo-shadow hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all text-black">
@@ -428,29 +428,6 @@
       <div class="flex gap-2 mt-2">
         <button id="btn-open-instagram-app" class="flex-1 bg-primary border-[2px] border-black p-3 font-headline font-black text-xs uppercase neo-shadow hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all text-black flex items-center justify-center gap-1.5">
           인스타그램 열기 <span class="material-symbols-outlined text-xs">rocket_launch</span>
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 상품 이동 안내 및 컨펌 팝업 (모달) -->
-  <div id="musinsa-redirect-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-6">
-    <div class="bg-white border-[3px] border-black p-6 max-w-sm w-full neo-shadow flex flex-col gap-4">
-      <div class="flex justify-between items-center border-b-[2px] border-black pb-2 bg-[#ffdad6] -mx-6 -mt-6 p-4">
-        <h4 class="font-headline font-black text-sm uppercase text-black flex items-center gap-1">
-          <span class="material-symbols-outlined text-sm font-bold">open_in_new</span> VIEW PRODUCT
-        </h4>
-        <button id="btn-close-musinsa-modal" class="text-xl font-bold leading-none hover:text-error">&times;</button>
-      </div>
-      <p class="text-xs font-bold text-black leading-relaxed">
-        추천 아이템인 <span class="bg-cream border-[2px] border-black px-1.5 py-0.5 font-bold" id="musinsa-item-name">독일군 스니커즈</span> 상품 페이지로 이동하시겠습니까?
-      </p>
-      <div class="flex gap-2 mt-2">
-        <button id="btn-close-musinsa-modal-cancel" class="flex-1 bg-[#eeeeee] border-[2px] border-black p-3 font-bold text-xs uppercase hover:bg-gray-100 transition-all text-black">
-          취소
-        </button>
-        <button id="btn-confirm-musinsa-redirect" class="flex-1 bg-secondary border-[2px] border-black p-3 font-headline font-black text-xs uppercase neo-shadow hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all text-black flex items-center justify-center gap-1">
-          이동하기 <span class="material-symbols-outlined text-xs">open_in_new</span>
         </button>
       </div>
     </div>

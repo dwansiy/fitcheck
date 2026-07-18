@@ -24,8 +24,7 @@ const state = {
   opponentScore: 0,
   opponentTpo: '일상',
 
-  // 무신사 연계 팝업용 임시 보관 상태
-  targetMusinsaUrl: '',
+  // 현재 선택한 무신사 검색 아이템
   targetMusinsaItem: '독일군 스니커즈',
 
   // AI API 결과 임시 보관
@@ -41,7 +40,6 @@ const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const MAX_ANALYSIS_IMAGE_DIMENSION = 1600;
 const ALLOWED_UPLOAD_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const RECENT_RESULTS_KEY = 'fitcheck.recentResults.v1';
-const APP_RUNTIME = import.meta.env.VITE_APP_RUNTIME === 'toss' ? 'toss' : 'web';
 const BLOCKED_STYLE_EDIT_PATTERN = /(귀걸이|이어링|earrings?|반지|손가락\s*링|finger\s*ring|피어싱|piercings?)/i;
 const EDITABLE_STYLE_ITEM_TYPES = new Set(['clothing', 'bag', 'belt', 'shoes', 'watch', 'fashion-accessory']);
 
@@ -149,12 +147,6 @@ const dom = {
   resultHeaderBadge: document.getElementById('result-header-badge'),
   resultTopOverlayBadge: document.getElementById('result-top-overlay-badge'),
   
-  // 무신사 연동 모달 관련 DOM
-  musinsaRedirectModal: document.getElementById('musinsa-redirect-modal'),
-  btnCloseMusinsaModal: document.getElementById('btn-close-musinsa-modal'),
-  btnCloseMusinsaModalCancel: document.getElementById('btn-close-musinsa-modal-cancel'),
-  btnConfirmMusinsaRedirect: document.getElementById('btn-confirm-musinsa-redirect'),
-  musinsaItemName: document.getElementById('musinsa-item-name'),
   pinInteractionGuide: document.getElementById('pin-interaction-guide')
 };
 
@@ -273,24 +265,6 @@ function bindEvents() {
     dom.btnOpenInstagramApp.addEventListener('click', openInstagramApp);
   }
 
-  // 11. 쇼핑 링크: 웹은 바로 이동하고, 토스 WebView에서만 이탈 확인을 거칩니다.
-  document.addEventListener('click', handleShoppingLinkClick);
-  if (dom.btnCloseMusinsaModal) {
-    dom.btnCloseMusinsaModal.addEventListener('click', () => {
-      dom.musinsaRedirectModal.classList.add('hidden');
-    });
-  }
-  if (dom.btnCloseMusinsaModalCancel) {
-    dom.btnCloseMusinsaModalCancel.addEventListener('click', () => {
-      dom.musinsaRedirectModal.classList.add('hidden');
-    });
-  }
-  if (dom.btnConfirmMusinsaRedirect) {
-    dom.btnConfirmMusinsaRedirect.addEventListener('click', () => {
-      openExternalShoppingUrl(state.targetMusinsaUrl);
-      dom.musinsaRedirectModal.classList.add('hidden');
-    });
-  }
 }
 
 // ========================================================
@@ -346,24 +320,6 @@ async function handleCustomFileUpload(e) {
     console.warn('Image upload validation failed.', error);
     rejectImageUpload('사진을 읽을 수 없어요. 손상되지 않은 다른 사진을 선택해 주세요. 🧩');
   }
-}
-
-function handleShoppingLinkClick(event) {
-  const link = event.target instanceof Element
-    ? event.target.closest('[data-shopping-link="true"]')
-    : null;
-  if (!link || APP_RUNTIME !== 'toss') return;
-
-  event.preventDefault();
-  state.targetMusinsaUrl = link.href;
-  state.targetMusinsaItem = link.dataset.itemName || '추천 아이템';
-  dom.musinsaItemName.textContent = state.targetMusinsaItem;
-  dom.musinsaRedirectModal.classList.remove('hidden');
-}
-
-function openExternalShoppingUrl(url) {
-  if (!url) return;
-  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 async function trySampleExperience() {
@@ -757,9 +713,7 @@ function showPinTooltip(type, index = 0) {
       : '다음 개선 포인트 보기 →';
     state.worstMatch = selectedMatch;
     state.targetMusinsaItem = selectedMatch.recommendItem;
-    state.targetMusinsaUrl = `https://www.musinsa.com/search/goods?keyword=${query}`;
-    dom.linkShopping.href = state.targetMusinsaUrl;
-    dom.linkShopping.dataset.itemName = state.targetMusinsaItem;
+    dom.linkShopping.href = `https://www.musinsa.com/search/goods?keyword=${query}`;
     const styleEditSupported = isStyleEditSupported(selectedMatch);
     dom.styleEditPolicyNote.textContent = styleEditSupported
       ? ''
