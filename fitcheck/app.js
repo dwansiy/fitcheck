@@ -1,4 +1,4 @@
-import { saveBase64Data } from '@apps-in-toss/web-framework';
+import { openURL, saveBase64Data } from '@apps-in-toss/web-framework';
 
 // ========================================================
 // FITCHECK! CORE APP CONTROLLER
@@ -2105,44 +2105,20 @@ function fallbackCopyTextToClipboard(text) {
   document.body.removeChild(textArea);
 }
 
-// 무신사 앱이 설치되어 있으면 앱으로 열고, 없으면(또는 안드로이드가 아니면) 웹으로 이동한다.
-function openMusinsaSearch(url) {
-  const isAndroid = /Android/i.test(navigator.userAgent);
-  if (!isAndroid) {
-    remoteLog('openMusinsaSearch', { branch: 'non-android-web-open', url });
-    window.open(url, '_blank');
-    return;
-  }
-
-  // 안드로이드 표준 Intent URI: 무신사 앱(com.musinsa.store)이 설치되어 있으면
-  // 앱으로 바로 이동하고, 없으면 S.browser_fallback_url로 지정한 웹 페이지로 이동한다.
-  const withoutScheme = url.replace(/^https?:\/\//, '');
-  const intentUrl = `intent://${withoutScheme}#Intent;scheme=https;package=com.musinsa.store;S.browser_fallback_url=${encodeURIComponent(url)};end`;
-  remoteLog('openMusinsaSearch', { branch: 'attempt-intent', intentUrl });
-
-  // 앱인토스 웹뷰가 intent:// 를 지원하지 않을 경우를 대비해, 페이지가 계속 보이면
-  // (= 앱으로 전환되지 않았으면) 직접 웹 URL로 폴백한다.
-  const fallbackTimer = setTimeout(() => {
-    remoteLog('openMusinsaSearch', { branch: 'fallback-timer-fired', documentHidden: document.hidden, url });
-    window.open(url, '_blank');
-  }, 2500);
-  const cancelFallback = (reason) => {
-    remoteLog('openMusinsaSearch', { branch: 'fallback-cancelled', reason });
-    clearTimeout(fallbackTimer);
-    document.removeEventListener('visibilitychange', onVisibilityChange);
-  };
-  const onVisibilityChange = () => {
-    if (document.hidden) cancelFallback('visibilitychange-hidden');
-  };
-  document.addEventListener('visibilitychange', onVisibilityChange);
-
+// Toss 브리지를 통해 무신사 HTTPS 링크를 열고, 일반 브라우저에서는 웹으로 폴백한다.
+// 설치된 앱이 해당 링크를 처리하도록 등록되어 있으면 운영체제가 앱으로 연결한다.
+async function openMusinsaSearch(url) {
   try {
-    window.location.href = intentUrl;
-    remoteLog('openMusinsaSearch', { branch: 'intent-navigation-called-no-throw' });
-  } catch (err) {
-    remoteLog('openMusinsaSearch', { branch: 'intent-threw', message: err?.message });
-    cancelFallback('intent-threw');
-    window.open(url, '_blank');
+    await openURL(url);
+    remoteLog('openMusinsaSearch', { branch: 'apps-in-toss-open-succeeded', url });
+  } catch (bridgeError) {
+    console.warn('앱인토스 외부 링크 브릿지를 사용할 수 없어 웹 페이지로 전환합니다.', bridgeError);
+    remoteLog('openMusinsaSearch', {
+      branch: 'apps-in-toss-open-failed',
+      message: bridgeError?.message,
+      url,
+    });
+    window.open(url, '_blank', 'noopener,noreferrer');
   }
 }
 
