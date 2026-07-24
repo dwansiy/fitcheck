@@ -1,3 +1,5 @@
+import { saveBase64Data } from '@apps-in-toss/web-framework';
+
 // ========================================================
 // FITCHECK! CORE APP CONTROLLER
 // ========================================================
@@ -2260,9 +2262,8 @@ function dataUrlToBlob(dataUrl) {
   return new Blob([bytes], { type: mimeType });
 }
 
-// 선택적 이미지 다운로드 실행
-// 참고: 이 웹뷰 환경엔 Web Share API 자체가 없음(navigator.share === undefined)이
-// 로그로 확인되어, 공유 시트 경유 방식은 포기하고 blob URL 다운로드로 시도한다.
+// Apps in Toss에서는 네이티브 저장 브리지를 우선 사용하고, 일반 브라우저에서는
+// Blob 다운로드로 폴백한다.
 async function downloadShareImage() {
   remoteLog('downloadShareImage', {
     branch: 'called',
@@ -2274,6 +2275,26 @@ async function downloadShareImage() {
     return;
   }
 
+  const fileName = `fitcheck_ootd_${state.score}.png`;
+  const base64Data = state.shareImageDataUrl.split(',')[1];
+  try {
+    await saveBase64Data({
+      data: base64Data,
+      fileName,
+      mimeType: 'image/png',
+    });
+    remoteLog('downloadShareImage', { branch: 'apps-in-toss-save-succeeded', fileName });
+    showToast("이미지를 기기에 저장했어요! 갤러리 또는 파일 앱을 확인해 주세요. 💾");
+    playSound('download');
+    return;
+  } catch (bridgeError) {
+    console.warn('앱인토스 저장 브릿지를 사용할 수 없어 브라우저 다운로드로 전환합니다.', bridgeError);
+    remoteLog('downloadShareImage', {
+      branch: 'apps-in-toss-save-failed',
+      message: bridgeError?.message,
+    });
+  }
+
   let objectUrl;
   try {
     const blob = dataUrlToBlob(state.shareImageDataUrl);
@@ -2283,7 +2304,7 @@ async function downloadShareImage() {
     remoteLog('downloadShareImage', { branch: 'object-url-created', objectUrl });
 
     const downloadLink = document.createElement('a');
-    downloadLink.download = `fitcheck_ootd_${state.score}.png`;
+    downloadLink.download = fileName;
     downloadLink.href = objectUrl;
     document.body.appendChild(downloadLink);
     downloadLink.click();
