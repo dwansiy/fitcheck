@@ -925,7 +925,8 @@ function startInlineStyleEdit(recommendItemName) {
   let step = 0;
   hideTooltip();
   dom.styleEditStatus.textContent = messages[0];
-  dom.styleEditScorePanel.classList.add('hidden');
+  dom.styleEditScorePanel.classList.add('is-waiting');
+  dom.styleEditScorePanel.classList.remove('hidden');
   dom.styleEditScoreDelta.textContent = '';
   dom.styleEditOverlay.classList.remove('hidden');
   dom.styleEditOverlay.classList.add('flex');
@@ -942,7 +943,7 @@ function startInlineStyleEdit(recommendItemName) {
 }
 
 function animateInlineScore(from, to) {
-  dom.styleEditScorePanel.classList.remove('hidden');
+  dom.styleEditScorePanel.classList.remove('is-waiting');
   const delta = to - from;
   dom.styleEditScoreDelta.textContent = delta >= 0 ? `+${delta.toLocaleString()} UP!` : `${delta.toLocaleString()}`;
   dom.styleEditStatus.textContent = delta > 0

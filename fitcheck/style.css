@@ -238,3 +238,27 @@ section.active-screen {
 .tag-connection-line-devil.active-line {
   stroke: #f87171; /* 활성 시 연분홍 실선 */
 }
+
+/* 상태 문구와 점수가 바뀌어도 AI 스타일 개선 다이얼로그 크기를 유지한다. */
+.style-edit-dialog {
+  width: min(300px, calc(100vw - 4rem));
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.style-edit-status {
+  min-height: 3em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.style-edit-score-panel {
+  min-height: 58px;
+}
+
+.style-edit-score-panel.is-waiting {
+  visibility: hidden;
+}

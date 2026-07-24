@@ -287,12 +287,12 @@
             <button id="btn-show-after" class="px-2 py-1 text-[10px] font-black bg-secondary">AFTER</button>
           </div>
 
-          <div id="style-edit-overlay" class="absolute inset-0 z-40 hidden bg-white/60 backdrop-blur-[3px] flex-col items-center justify-center text-center p-6">
+          <div id="style-edit-overlay" class="absolute inset-0 z-40 hidden bg-white/60 backdrop-blur-[3px] flex-col items-center justify-center text-center p-6" aria-live="polite">
             <div class="w-16 h-16 rounded-full border-[4px] border-black border-dashed animate-spin"></div>
-            <div class="mt-4 bg-secondary border-[3px] border-black px-4 py-3 shadow-[3px_3px_0_#000]">
+            <div class="style-edit-dialog mt-4 bg-secondary border-[3px] border-black px-4 py-3 shadow-[3px_3px_0_#000]">
               <p class="font-headline text-sm font-black">AI 스타일 리믹스 중...</p>
-              <p id="style-edit-status" class="text-[10px] font-bold mt-1">추천 코디를 자연스럽게 입혀보는 중...</p>
-              <div id="style-edit-score-panel" class="hidden mt-3 bg-white border-[2px] border-black px-3 py-2">
+              <p id="style-edit-status" class="style-edit-status text-[10px] font-bold mt-1">추천 코디를 자연스럽게 입혀보는 중...</p>
+              <div id="style-edit-score-panel" class="style-edit-score-panel is-waiting mt-3 bg-white border-[2px] border-black px-3 py-2">
                 <p class="text-[9px] font-black">FASHION POWER</p>
                 <p class="font-headline font-black"><span id="style-edit-score">0</span> <span id="style-edit-score-delta" class="text-error text-xs"></span></p>
               </div>
