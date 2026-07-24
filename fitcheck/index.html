@@ -437,26 +437,19 @@
         <img id="instagram-preview-img" src="" alt="Instagram Story Preview" class="h-full object-contain" />
       </div>
       <p class="text-xs font-bold text-black leading-relaxed">
-        생성된 카드를 인스타그램 스토리에 공유해보세요! 📸
+        공유 카드가 준비됐어요. 기기에 저장하거나 공유 시트에서 인스타그램을 선택해 주세요. 📸
       </p>
       <div class="bg-tertiary border-[2px] border-black p-3 text-[10px] font-bold text-black">
-        💡 Tip: 이미지를 저장한 후 인스타그램에서 스토리로 업로드해보세요.
+        💡 Tip: 토스 웹뷰에서는 인스타 스토리 작성 화면을 바로 열 수 없어, 공유 시트를 지원하지 않는 기기에서는 이미지를 저장한 뒤 직접 선택해야 해요.
       </div>
       <div class="flex flex-col gap-2 mt-2">
         <!-- 모바일 시스템 공유 버튼 (Web Share API 대응) -->
         <button id="btn-share-system" class="w-full bg-secondary border-[2px] border-black p-3 font-headline font-black text-xs uppercase neo-shadow hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all text-black flex items-center justify-center gap-1.5 hidden">
-          스토리로 바로 공유 <span class="material-symbols-outlined text-xs">share</span>
+          공유 시트 열기 (인스타 선택) <span class="material-symbols-outlined text-xs">share</span>
         </button>
-        <div class="flex gap-2 w-full">
-          <!-- 기기 저장 버튼 -->
-          <button id="btn-download-image" class="flex-1 bg-[#eeeeee] border-[2px] border-black p-3 font-headline font-black text-xs uppercase neo-shadow hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all text-black flex items-center justify-center gap-1.5">
-            이미지 저장 <span class="material-symbols-outlined text-xs">download</span>
-          </button>
-          <!-- 인스타그램 열기 버튼 -->
-          <button id="btn-open-instagram-app" class="flex-1 bg-primary border-[2px] border-black p-3 font-headline font-black text-xs uppercase neo-shadow hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all text-black flex items-center justify-center gap-1.5">
-            인스타그램 열기 <span class="material-symbols-outlined text-xs">rocket_launch</span>
-          </button>
-        </div>
+        <button id="btn-download-image" class="w-full bg-[#eeeeee] border-[2px] border-black p-3 font-headline font-black text-xs uppercase neo-shadow hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all text-black flex items-center justify-center gap-1.5">
+          기기에 저장 <span class="material-symbols-outlined text-xs">download</span>
+        </button>
       </div>
     </div>
   </div>

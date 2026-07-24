@@ -117,7 +117,6 @@ const dom = {
   btnCopyLink: document.getElementById('btn-copy-link'),
   instagramRedirectModal: document.getElementById('instagram-redirect-modal'),
   btnCloseRedirectModal: document.getElementById('btn-close-redirect-modal'),
-  btnOpenInstagramApp: document.getElementById('btn-open-instagram-app'),
   btnShareSystem: document.getElementById('btn-share-system'),
   btnDownloadImage: document.getElementById('btn-download-image'),
   instagramPreviewImg: document.getElementById('instagram-preview-img'),
@@ -285,9 +284,6 @@ function bindEvents() {
     dom.btnCloseRedirectModal.addEventListener('click', () => {
       dom.instagramRedirectModal.classList.add('hidden');
     });
-  }
-  if (dom.btnOpenInstagramApp) {
-    dom.btnOpenInstagramApp.addEventListener('click', openInstagramApp);
   }
   if (dom.btnShareSystem) {
     dom.btnShareSystem.addEventListener('click', shareSystem);
@@ -2109,13 +2105,6 @@ function fallbackCopyTextToClipboard(text) {
   document.body.removeChild(textArea);
 }
 
-// 인스타그램 웹 연동
-// 주의: instagram:// 커스텀 스킴은 앱인토스 웹뷰 네이티브 브릿지(Linking)에서
-// 지원하지 않는 스킴이라 열 수 없다는 경고가 발생하고 좀처럼 닫히지 않는다.
-// (앱인토스 SDK도 외부 앱 스킴을 여는 API를 제공하지 않음)
-// 대신 파일 공유가 가능하면 네이티브 공유 시트를 띄운다 - 사용자가 시트에서 인스타그램을
-// 선택하면 인스타그램 앱 자체의 스토리/게시물 작성 화면으로 사진과 함께 바로 이동한다.
-// 공유가 불가능한 환경(데스크탑 등)에서만 인스타그램 웹으로 폴백한다.
 // 무신사 앱이 설치되어 있으면 앱으로 열고, 없으면(또는 안드로이드가 아니면) 웹으로 이동한다.
 function openMusinsaSearch(url) {
   const isAndroid = /Android/i.test(navigator.userAgent);
@@ -2185,53 +2174,11 @@ function logShareCapability(tag) {
   return canShareFiles;
 }
 
-// 참고: 이 웹뷰엔 Web Share API가 없고(navigator.share === undefined, 로그로 확인됨),
-// 이미지를 첨부한 채로 인스타 스토리 작성 화면을 여는 건 안드로이드 네이티브
-// content:// URI가 필요해서 웹에서는 만들 수 없다. 그래서 여기서는 "이미지는 이미
-// 저장되어 있으니, 인스타그램 앱만 열어서 사용자가 직접 첨부하게" 하는 것을 목표로 한다.
-async function openInstagramApp() {
-  playSound('select');
-  logShareCapability('openInstagramApp');
-
-  const isAndroid = /Android/i.test(navigator.userAgent);
-  if (!isAndroid) {
-    remoteLog('openInstagramApp', { branch: 'non-android-web-open' });
-    window.open("https://www.instagram.com/", "_blank");
-    return;
-  }
-
-  const intentUrl = 'intent://instagram.com/#Intent;package=com.instagram.android;scheme=https;S.browser_fallback_url=' + encodeURIComponent('https://www.instagram.com/') + ';end';
-  remoteLog('openInstagramApp', { branch: 'attempt-intent', intentUrl });
-
-  const fallbackTimer = setTimeout(() => {
-    remoteLog('openInstagramApp', { branch: 'fallback-timer-fired', documentHidden: document.hidden });
-    window.open("https://www.instagram.com/", "_blank");
-  }, 2500);
-  const cancelFallback = (reason) => {
-    remoteLog('openInstagramApp', { branch: 'fallback-cancelled', reason });
-    clearTimeout(fallbackTimer);
-    document.removeEventListener('visibilitychange', onVisibilityChange);
-  };
-  const onVisibilityChange = () => {
-    if (document.hidden) cancelFallback('visibilitychange-hidden');
-  };
-  document.addEventListener('visibilitychange', onVisibilityChange);
-
-  try {
-    window.location.href = intentUrl;
-    remoteLog('openInstagramApp', { branch: 'intent-navigation-called-no-throw' });
-  } catch (err) {
-    remoteLog('openInstagramApp', { branch: 'intent-threw', message: err?.message });
-    cancelFallback('intent-threw');
-    window.open("https://www.instagram.com/", "_blank");
-  }
-}
-
 // 시스템 공유 API 호출 (Web Share API)
 async function shareSystem() {
   playSound('select');
-  if (!state.shareImageFile) {
-    showToast("공유할 이미지 파일이 준비되지 않았습니다.");
+  if (!state.shareImageFile || !navigator.share) {
+    showToast("이 환경에서는 이미지 공유를 지원하지 않아요.");
     return;
   }
 
